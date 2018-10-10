@@ -1,17 +1,18 @@
 [package]
-name = "kg-diag"
+name = "kg-diag-test"
 version = "0.1.0"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 description = """
-Error/diagnostic management
+Tests excluded into separate crate due to circular dependency
 """
-readme = "README.md"
-license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Kodegenix/kg-diag"
 workspace = ".."
+publish = false
 
 [dependencies]
 kg-display-derive = "0.1"
 backtrace = "0.3"
 
+[dev-dependencies]
+kg-io = "0.1"
 

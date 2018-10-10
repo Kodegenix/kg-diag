@@ -1,4 +1,4 @@
-#![feature(specialization, attr_literals)]
+#![feature(specialization)]
 
 extern crate kg_diag;
 #[macro_use]

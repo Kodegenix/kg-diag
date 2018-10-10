@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "kg-diag",
-    "kg-diag-derive"
+    "kg-diag-derive",
+    #"kg-diag-test",
 ]
