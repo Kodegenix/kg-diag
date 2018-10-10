@@ -9,10 +9,9 @@ repository = "https://github.com/Kodegenix/kg-diag"
 workspace = ".."
 publish = false
 
-[dependencies]
-kg-display-derive = "0.1"
-backtrace = "0.3"
-
 [dev-dependencies]
+kg-diag = "0.1"
 kg-io = "0.1"
 
+[replace]
+"kg-diag:0.1.0" = { path = "../kg-diag" }
