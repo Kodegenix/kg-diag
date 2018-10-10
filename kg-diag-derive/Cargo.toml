@@ -1,0 +1,24 @@
+[package]
+name = "kg-diag-derive"
+version = "0.1.0"
+authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
+description = """
+Macro implementation for #[derive(Detail)].
+"""
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/Kodegenix/kg-diag"
+workspace = ".."
+
+[lib]
+proc-macro = true
+
+[dependencies]
+kg-diag = { version = "0.1", path = "../kg-diag" }
+proc-macro2 = { version = "0.4", features = ["nightly"] }
+quote = "0.6"
+syn = { version = "0.15", features = ["full"] }
+synstructure = "0.10"
+
+[dev-dependencies]
+kg-display-derive = "0.1"

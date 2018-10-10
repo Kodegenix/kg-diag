@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "kg-diag",
+    "kg-diag-derive"
+]
