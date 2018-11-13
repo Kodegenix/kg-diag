@@ -88,7 +88,7 @@ impl std::fmt::Display for Errors {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "multiple errors\n")?;
         if let Some(ref s) = self.stacktrace {
-            write!(f, "{:?}", s);
+            write!(f, "{:?}", s)?;
         }
         Ok(())
     }
