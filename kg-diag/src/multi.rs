@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug)]
 pub struct Diags {
     diags: Vec<Box<Diag>>,
@@ -35,7 +34,6 @@ impl Diags {
     }
 }
 
-
 pub trait ResultExt<T, E: Diag> {
     fn add_err(self, diags: &mut Diags) -> Result<T, Errors>;
 }
@@ -48,7 +46,6 @@ impl<T, E: Diag> ResultExt<T, E> for Result<T, E> {
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct Errors {
@@ -93,7 +90,6 @@ impl std::fmt::Display for Errors {
         Ok(())
     }
 }
-
 
 /*
 

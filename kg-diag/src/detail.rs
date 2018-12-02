@@ -1,9 +1,8 @@
 use super::*;
 
-use std::fmt::{Display, Debug};
 use std::any::TypeId;
 use std::convert::TryFrom;
-
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Display, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum Severity {
@@ -29,11 +28,11 @@ pub enum Severity {
 impl Severity {
     pub fn code_byte(&self) -> u8 {
         match *self {
-            Severity::Info      => b'I',
-            Severity::Warning   => b'W',
-            Severity::Error     => b'E',
-            Severity::Failure   => b'F',
-            Severity::Critical  => b'C',
+            Severity::Info => b'I',
+            Severity::Warning => b'W',
+            Severity::Error => b'E',
+            Severity::Failure => b'F',
+            Severity::Critical => b'C',
         }
     }
 
@@ -80,11 +79,10 @@ impl TryFrom<char> for Severity {
             'E' => Severity::Error,
             'F' => Severity::Failure,
             'C' => Severity::Critical,
-            _ => return Err(value)
+            _ => return Err(value),
         })
     }
 }
-
 
 pub trait Detail: Display + Debug + Send + Sync + 'static {
     fn severity(&self) -> Severity {
@@ -131,4 +129,3 @@ impl Detail {
         }
     }
 }
-
