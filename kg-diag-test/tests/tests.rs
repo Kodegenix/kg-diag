@@ -7,16 +7,12 @@ extern crate kg_io;
 use kg_diag::{Detail, Diag};
 use kg_io::*;
 
-
 #[derive(Debug)]
 enum TestErrorKind {
     ErrorEmpty,
     ErrorWithPair(usize, usize),
     ErrorWithString(String),
-    ErrorWithStruct {
-        a: usize,
-        b: usize,
-    }
+    ErrorWithStruct { a: usize, b: usize },
 }
 
 impl std::fmt::Display for TestErrorKind {
@@ -25,7 +21,7 @@ impl std::fmt::Display for TestErrorKind {
             TestErrorKind::ErrorEmpty => write!(f, "empty"),
             TestErrorKind::ErrorWithPair(..) => write!(f, "pair"),
             TestErrorKind::ErrorWithString(..) => write!(f, "string"),
-            TestErrorKind::ErrorWithStruct {..} => write!(f, "struct"),
+            TestErrorKind::ErrorWithStruct { .. } => write!(f, "struct"),
         }
     }
 }
@@ -36,7 +32,7 @@ impl Detail for TestErrorKind {
             TestErrorKind::ErrorEmpty => 1,
             TestErrorKind::ErrorWithPair(..) => 2,
             TestErrorKind::ErrorWithString(..) => 3,
-            TestErrorKind::ErrorWithStruct {..} => 4,
+            TestErrorKind::ErrorWithStruct { .. } => 4,
         }
     }
 }
@@ -74,4 +70,3 @@ fn macro_diags_with_kind_and_quotes() {
 
     assert!(es.contains("  2| line 2;\n   | ^^^^^^^ msg\n"));
 }
-

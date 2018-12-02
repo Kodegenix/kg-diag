@@ -6,18 +6,17 @@ extern crate test;
 #[macro_use]
 extern crate kg_display_derive;
 
-mod io;
 mod detail;
 mod diag;
+mod io;
 mod multi;
 mod stacktrace;
 
-pub use self::io::{Quote, Position, LexTerm, LexToken};
-pub use self::detail::{Severity, Detail};
-pub use self::diag::{Diag, BasicDiag, SimpleDiag, ParseDiag};
+pub use self::detail::{Detail, Severity};
+pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
+pub use self::io::{LexTerm, LexToken, Position, Quote};
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
-
 
 #[macro_export]
 macro_rules! basic_diag {
@@ -82,17 +81,21 @@ mod tests {
 
         impl std::fmt::Display for InvalidToken {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "invalid token '{}', expected one of {:?}", self.found, self.expected)
+                write!(
+                    f,
+                    "invalid token '{}', expected one of {:?}",
+                    self.found, self.expected
+                )
             }
         }
 
         let err: ParseDiag = InvalidToken {
             expected: &["id", "num", "+", "-"],
             found: "*".into(),
-        }.into();
+        }
+        .into();
 
         println!("{:#?}", err);
         println!("{}", err);
     }
 }
-

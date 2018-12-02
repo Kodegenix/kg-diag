@@ -1,6 +1,6 @@
 use std;
-use std::path::{Path, PathBuf};
 use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Position {
@@ -56,8 +56,15 @@ pub struct Quote {
 
 #[allow(unused)]
 impl Quote {
-    pub fn new<'a>(path: Option<&Path>, data: &[u8], from: Position, to: Position,
-                   lines_before: u32, lines_after: u32, message: Cow<'a, str>) -> Quote {
+    pub fn new<'a>(
+        path: Option<&Path>,
+        data: &[u8],
+        from: Position,
+        to: Position,
+        lines_before: u32,
+        lines_after: u32,
+        message: Cow<'a, str>,
+    ) -> Quote {
         let mut line = 0;
         let mut off1 = 0;
         let mut off2 = data.len();
@@ -131,13 +138,25 @@ impl std::fmt::Display for Quote {
 
         let show_line_numbers = self.path.is_some() || self.line != 0 || self.source.len() > 1;
         let line_chars = if show_line_numbers {
-            cmp::max(((self.line + self.source.len() as u32 + 1) as f64).log10().ceil() as usize, 3)
+            cmp::max(
+                ((self.line + self.source.len() as u32 + 1) as f64)
+                    .log10()
+                    .ceil() as usize,
+                3,
+            )
         } else {
             0
         };
         let mut ln = self.line;
         if self.path.is_some() {
-            write!(f, "{0:>1$} {2}:{3}\n", " -->", line_chars, self.path.as_ref().unwrap().to_str().unwrap(), self.from)?;
+            write!(
+                f,
+                "{0:>1$} {2}:{3}\n",
+                " -->",
+                line_chars,
+                self.path.as_ref().unwrap().to_str().unwrap(),
+                self.from
+            )?;
         }
         for s in self.source.lines() {
             if show_line_numbers {
@@ -164,10 +183,11 @@ impl std::fmt::Display for Quote {
     }
 }
 
-
 /// Marker trait representing terminals used in parsing
-pub trait LexTerm: std::fmt::Debug + std::fmt::Display + PartialEq + Eq + Sync + Send + 'static {}
-
+pub trait LexTerm:
+    std::fmt::Debug + std::fmt::Display + PartialEq + Eq + Sync + Send + 'static
+{
+}
 
 /// Generic token structure (i.e. terminal along with it's location in source)
 #[derive(Debug, Display, Clone, Copy)]
@@ -180,11 +200,7 @@ pub struct LexToken<T: LexTerm + Clone + Copy> {
 
 impl<T: LexTerm + Clone + Copy> LexToken<T> {
     pub fn new(term: T, from: Position, to: Position) -> LexToken<T> {
-        LexToken {
-            term,
-            from,
-            to,
-        }
+        LexToken { term, from, to }
     }
 
     pub fn term(&self) -> T {

@@ -26,12 +26,8 @@ enum TestErrorKind {
 
     #[diag(code = 4, severity = "failure")]
     #[display(fmt = "error with field a = {a} and field b = {b}")]
-    ErrorWithStruct {
-        a: usize,
-        b: usize,
-    }
+    ErrorWithStruct { a: usize, b: usize },
 }
-
 
 #[test]
 fn code_deref() {
@@ -40,4 +36,3 @@ fn code_deref() {
     println!("{}", e.severity());
     println!("{}", e);
 }
-
