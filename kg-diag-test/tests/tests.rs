@@ -2,7 +2,6 @@
 
 #[macro_use]
 extern crate kg_diag;
-extern crate kg_io;
 
 use kg_diag::{Detail, Diag};
 use kg_io::*;

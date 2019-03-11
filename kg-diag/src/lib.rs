@@ -1,7 +1,4 @@
-#![feature(box_syntax, specialization, rustc_private, raw, test, try_from)]
-
-extern crate backtrace;
-extern crate test;
+#![feature(box_syntax, specialization, rustc_private, raw, test)]
 
 #[macro_use]
 extern crate kg_display_derive;

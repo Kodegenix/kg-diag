@@ -1,13 +1,7 @@
-#![feature(try_from)]
-
-extern crate proc_macro2;
-extern crate syn;
 #[macro_use]
 extern crate synstructure;
 #[macro_use]
 extern crate quote;
-
-extern crate kg_diag;
 
 use kg_diag::*;
 

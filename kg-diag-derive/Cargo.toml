@@ -9,6 +9,7 @@ readme = "README.md"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Kodegenix/kg-diag"
 workspace = ".."
+edition = "2018"
 
 [lib]
 proc-macro = true

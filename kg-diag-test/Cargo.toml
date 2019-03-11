@@ -8,6 +8,7 @@ Tests excluded into separate crate due to circular dependency
 repository = "https://github.com/Kodegenix/kg-diag"
 workspace = ".."
 publish = false
+edition = "2018"
 
 [dev-dependencies]
 kg-diag = "0.1"
