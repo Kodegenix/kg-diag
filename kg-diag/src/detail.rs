@@ -1,5 +1,3 @@
-use super::*;
-
 use std::fmt::{Display, Debug};
 use std::any::TypeId;
 use std::convert::TryFrom;
@@ -53,7 +51,7 @@ impl Severity {
 impl<'a> TryFrom<&'a str> for Severity {
     type Error = &'a str;
 
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, <Self as TryFrom<&'a str>>::Error> {
         if value.eq_ignore_ascii_case("info") {
             Ok(Severity::Info)
         } else if value.eq_ignore_ascii_case("warning") {
@@ -73,7 +71,7 @@ impl<'a> TryFrom<&'a str> for Severity {
 impl TryFrom<char> for Severity {
     type Error = char;
 
-    fn try_from(value: char) -> Result<Self, Self::Error> {
+    fn try_from(value: char) -> Result<Self, <Self as TryFrom<char>>::Error> {
         Ok(match value.to_ascii_uppercase() {
             'I' => Severity::Info,
             'W' => Severity::Warning,

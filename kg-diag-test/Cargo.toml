@@ -11,8 +11,8 @@ publish = false
 edition = "2018"
 
 [dev-dependencies]
-kg-diag = "0.1"
-kg-io = "0.1"
+kg-diag = "0.1.0"
+kg-io = "0.1.0"
 
 [replace]
 "kg-diag:0.1.0" = { path = "../kg-diag" }

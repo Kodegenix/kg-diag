@@ -1,5 +1,3 @@
-use super::*;
-
 use backtrace::Backtrace;
 
 use std::sync::Mutex;
