@@ -15,10 +15,10 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-kg-diag = { version = "0.1.0" }
-proc-macro2 = { version = "0.4.29", features = ["nightly"] }
+kg-diag = "0.1.0"
+proc-macro2 = { version = "0.4.30", features = ["nightly"] }
 quote = "0.6.12"
-syn = { version = "0.15.33", features = ["full"] }
+syn = { version = "0.15.34", features = ["full"] }
 synstructure = "0.10.1"
 
 [dev-dependencies]
