@@ -13,6 +13,6 @@ edition = "2018"
 
 [dependencies]
 kg-display-derive = "0.1.0"
-backtrace = "0.3.18"
+backtrace = "0.3.22"
 
 
