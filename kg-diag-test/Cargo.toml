@@ -12,4 +12,4 @@ edition = "2018"
 
 [dev-dependencies]
 kg-diag = { version = "0.1.1", path = "../kg-diag" }
-kg-io = "0.1.0"
+kg-io = "0.1.1"
