@@ -97,25 +97,25 @@ pub trait Detail: Display + Debug + Send + Sync + 'static {
         TypeId::of::<Self>()
     }
 
-    fn as_fmt_debug(&self) -> &std::fmt::Debug;
+    fn as_fmt_debug(&self) -> &dyn std::fmt::Debug;
 
-    fn as_fmt_display(&self) -> &std::fmt::Display;
+    fn as_fmt_display(&self) -> &dyn std::fmt::Display;
 }
 
 default impl<T: Detail> Detail for T {
-    fn as_fmt_debug(&self) -> &std::fmt::Debug {
-        self as &std::fmt::Debug
+    fn as_fmt_debug(&self) -> &dyn std::fmt::Debug {
+        self as &dyn std::fmt::Debug
     }
 
-    fn as_fmt_display(&self) -> &std::fmt::Display {
-        self as &std::fmt::Display
+    fn as_fmt_display(&self) -> &dyn std::fmt::Display {
+        self as &dyn std::fmt::Display
     }
 }
 
-impl Detail {
+impl dyn Detail {
     pub fn downcast_ref<T: Detail>(&self) -> Option<&T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const Detail as *const T)) }
+            unsafe { Some(&*(self as *const dyn Detail as *const T)) }
         } else {
             None
         }
@@ -123,7 +123,7 @@ impl Detail {
 
     pub fn downcast_mut<T: Detail>(&mut self) -> Option<&mut T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&mut *(self as *mut Detail as *mut T)) }
+            unsafe { Some(&mut *(self as *mut dyn Detail as *mut T)) }
         } else {
             None
         }

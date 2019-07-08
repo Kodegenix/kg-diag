@@ -3,7 +3,7 @@ use super::*;
 
 #[derive(Debug)]
 pub struct Diags {
-    diags: Vec<Box<Diag>>,
+    diags: Vec<Box<dyn Diag>>,
     max_severity: Severity,
 }
 

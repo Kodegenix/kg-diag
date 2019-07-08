@@ -6,13 +6,13 @@ use std::any::TypeId;
 
 
 pub trait Diag: Display + Debug + Send + Sync + 'static {
-    fn detail(&self) -> &Detail;
+    fn detail(&self) -> &dyn Detail;
 
-    fn detail_mut(&mut self) -> &mut Detail;
+    fn detail_mut(&mut self) -> &mut dyn Detail;
 
-    fn cause(&self) -> Option<&Diag>;
+    fn cause(&self) -> Option<&dyn Diag>;
 
-    fn cause_mut(&mut self) -> Option<&mut Diag>;
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag>;
 
     fn stacktrace(&self) -> Option<&Stacktrace>;
 
@@ -21,10 +21,10 @@ pub trait Diag: Display + Debug + Send + Sync + 'static {
     }
 }
 
-impl Diag {
+impl dyn Diag {
     pub fn downcast_ref<T: Diag>(&self) -> Option<&T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&*(self as *const Diag as *const T)) }
+            unsafe { Some(&*(self as *const dyn Diag as *const T)) }
         } else {
             None
         }
@@ -32,7 +32,7 @@ impl Diag {
 
     pub fn downcast_mut<T: Diag>(&mut self) -> Option<&mut T> {
         if self.type_id() == TypeId::of::<T>() {
-            unsafe { Some(&mut *(self as *mut Diag as *mut T)) }
+            unsafe { Some(&mut *(self as *mut dyn Diag as *mut T)) }
         } else {
             None
         }
@@ -61,19 +61,19 @@ impl Diag {
 }
 
 default impl<T: Detail> Diag for T {
-    fn detail(&self) -> &Detail {
+    fn detail(&self) -> &dyn Detail {
         self
     }
 
-    fn detail_mut(&mut self) -> &mut Detail {
+    fn detail_mut(&mut self) -> &mut dyn Detail {
         self
     }
 
-    fn cause(&self) -> Option<&Diag> {
+    fn cause(&self) -> Option<&dyn Diag> {
         None
     }
 
-    fn cause_mut(&mut self) -> Option<&mut Diag> {
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         None
     }
 
@@ -86,7 +86,7 @@ default impl<T: Detail> Diag for T {
 #[derive(Debug)]
 pub struct BasicDiag {
     detail: DetailHolder,
-    cause: Option<Box<Diag>>,
+    cause: Option<Box<dyn Diag>>,
     stacktrace: Option<Box<Stacktrace>>,
 }
 
@@ -125,19 +125,19 @@ impl BasicDiag {
 }
 
 impl Diag for BasicDiag {
-    fn detail(&self) -> &Detail {
+    fn detail(&self) -> &dyn Detail {
         self.detail.as_ref()
     }
 
-    fn detail_mut(&mut self) -> &mut Detail {
+    fn detail_mut(&mut self) -> &mut dyn Detail {
         self.detail.as_mut()
     }
 
-    fn cause(&self) -> Option<&Diag> {
+    fn cause(&self) -> Option<&dyn Diag> {
         self.cause.as_ref().map(|d| d.as_ref())
     }
 
-    fn cause_mut(&mut self) -> Option<&mut Diag> {
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         self.cause.as_mut().map(|d| d.as_mut())
     }
 
@@ -162,7 +162,7 @@ impl<T: Detail> From<T> for BasicDiag {
 
 impl Display for BasicDiag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        (self as &Diag).display(f)
+        (self as &dyn Diag).display(f)
     }
 }
 
@@ -174,7 +174,7 @@ enum DetailHolder {
         vtable: *mut (),
         data: [u8; INPLACE_SIZE],
     },
-    Ref(Box<Detail>),
+    Ref(Box<dyn Detail>),
 }
 
 unsafe impl Send for DetailHolder {}
@@ -187,7 +187,7 @@ impl DetailHolder {
     fn new<T: Detail>(detail: T) -> DetailHolder {
         if std::mem::size_of::<T>() <= INPLACE_SIZE {
             unsafe {
-                let t: TraitObject = std::mem::transmute(&detail as &Detail);
+                let t: TraitObject = std::mem::transmute(&detail as &dyn Detail);
                 let mut h = DetailHolder::Inplace {
                     vtable: t.vtable,
                     data: std::mem::zeroed(),
@@ -206,8 +206,8 @@ impl DetailHolder {
     }
 }
 
-impl AsRef<Detail> for DetailHolder {
-    fn as_ref(&self) -> &Detail {
+impl AsRef<dyn Detail> for DetailHolder {
+    fn as_ref(&self) -> &dyn Detail {
         match self {
             &DetailHolder::Inplace { vtable, ref data } => {
                 unsafe {
@@ -225,8 +225,8 @@ impl AsRef<Detail> for DetailHolder {
     }
 }
 
-impl AsMut<Detail> for DetailHolder {
-    fn as_mut(&mut self) -> &mut Detail {
+impl AsMut<dyn Detail> for DetailHolder {
+    fn as_mut(&mut self) -> &mut dyn Detail {
         match self {
             &mut DetailHolder::Inplace { vtable, ref data } => {
                 unsafe {
@@ -247,7 +247,7 @@ impl AsMut<Detail> for DetailHolder {
 impl Drop for DetailHolder {
     fn drop(&mut self) {
         if let &mut DetailHolder::Inplace {..} = self {
-            let detail = self.as_mut() as *mut Detail;
+            let detail = self.as_mut() as *mut dyn Detail;
             unsafe {
                 std::ptr::drop_in_place(detail);
             }
@@ -271,8 +271,8 @@ impl Debug for DetailHolder {
 
 #[derive(Debug)]
 pub struct SimpleDiag {
-    detail: Box<Detail>,
-    cause: Option<Box<Diag>>,
+    detail: Box<dyn Detail>,
+    cause: Option<Box<dyn Diag>>,
     stacktrace: Option<Box<Stacktrace>>,
 }
 
@@ -311,19 +311,19 @@ impl SimpleDiag {
 }
 
 impl Diag for SimpleDiag {
-    fn detail(&self) -> &Detail {
+    fn detail(&self) -> &dyn Detail {
         self.detail.as_ref()
     }
 
-    fn detail_mut(&mut self) -> &mut Detail {
+    fn detail_mut(&mut self) -> &mut dyn Detail {
         self.detail.as_mut()
     }
 
-    fn cause(&self) -> Option<&Diag> {
+    fn cause(&self) -> Option<&dyn Diag> {
         self.cause.as_ref().map(|d| d.as_ref())
     }
 
-    fn cause_mut(&mut self) -> Option<&mut Diag> {
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         self.cause.as_mut().map(|d| d.as_mut())
     }
 
@@ -348,16 +348,16 @@ impl<T: Detail> From<T> for SimpleDiag {
 
 impl Display for SimpleDiag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        (self as &Diag).display(f)
+        (self as &dyn Diag).display(f)
     }
 }
 
 
 #[derive(Debug)]
 pub struct ParseDiag {
-    detail: Box<Detail>,
+    detail: Box<dyn Detail>,
     quotes: Vec<Quote>,
-    cause: Option<Box<Diag>>,
+    cause: Option<Box<dyn Diag>>,
     stacktrace: Option<Box<Stacktrace>>,
 }
 
@@ -408,19 +408,19 @@ impl ParseDiag {
 }
 
 impl Diag for ParseDiag {
-    fn detail(&self) -> &Detail {
+    fn detail(&self) -> &dyn Detail {
         self.detail.as_ref()
     }
 
-    fn detail_mut(&mut self) -> &mut Detail {
+    fn detail_mut(&mut self) -> &mut dyn Detail {
         self.detail.as_mut()
     }
 
-    fn cause(&self) -> Option<&Diag> {
+    fn cause(&self) -> Option<&dyn Diag> {
         self.cause.as_ref().map(|d| d.as_ref())
     }
 
-    fn cause_mut(&mut self) -> Option<&mut Diag> {
+    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         self.cause.as_mut().map(|d| d.as_mut())
     }
 
@@ -445,6 +445,6 @@ impl<T: Detail> From<T> for ParseDiag {
 
 impl Display for ParseDiag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        (self as &Diag).display(f)
+        (self as &dyn Diag).display(f)
     }
 }
