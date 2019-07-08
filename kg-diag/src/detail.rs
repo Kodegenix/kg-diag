@@ -1,7 +1,6 @@
-use std::fmt::{Display, Debug};
 use std::any::TypeId;
 use std::convert::TryFrom;
-
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Display, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum Severity {

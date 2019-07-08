@@ -6,7 +6,6 @@ extern crate kg_diag;
 use kg_diag::{Detail, Diag};
 use kg_io::*;
 
-
 #[derive(Debug)]
 enum TestErrorKind {
     ErrorEmpty,

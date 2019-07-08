@@ -1,13 +1,11 @@
+extern crate quote;
 #[macro_use]
 extern crate synstructure;
-#[macro_use]
-extern crate quote;
 
-use kg_diag::*;
-
-use proc_macro2::Span;
 use std::convert::TryFrom;
 
+use kg_diag::*;
+use proc_macro2::Span;
 
 decl_derive!([Detail, attributes(diag)] => detail_derive);
 

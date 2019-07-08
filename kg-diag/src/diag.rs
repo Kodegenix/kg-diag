@@ -1,9 +1,8 @@
-use super::*;
-
-use std::raw::TraitObject;
-use std::fmt::{Display, Debug};
 use std::any::TypeId;
+use std::fmt::{Debug, Display};
+use std::raw::TraitObject;
 
+use super::*;
 
 pub trait Diag: Display + Debug + Send + Sync + 'static {
     fn detail(&self) -> &dyn Detail;

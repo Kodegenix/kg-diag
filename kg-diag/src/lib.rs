@@ -3,18 +3,17 @@
 #[macro_use]
 extern crate kg_display_derive;
 
+pub use self::detail::{Detail, Severity};
+pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
+pub use self::io::{LexTerm, LexToken, Position, Quote};
+pub use self::multi::{Diags, Errors};
+pub use self::stacktrace::Stacktrace;
+
 mod io;
 mod detail;
 mod diag;
 mod multi;
 mod stacktrace;
-
-pub use self::io::{Quote, Position, LexTerm, LexToken};
-pub use self::detail::{Severity, Detail};
-pub use self::diag::{Diag, BasicDiag, SimpleDiag, ParseDiag};
-pub use self::multi::{Diags, Errors};
-pub use self::stacktrace::Stacktrace;
-
 
 #[macro_export]
 macro_rules! basic_diag {

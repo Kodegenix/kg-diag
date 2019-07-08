@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug)]
 pub struct Diags {
     diags: Vec<Box<dyn Diag>>,

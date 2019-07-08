@@ -4,7 +4,6 @@ extern crate kg_diag;
 
 use kg_diag::*;
 
-
 #[derive(Debug)]
 struct InvalidToken {
     expected: &'static [&'static str],

@@ -1,8 +1,7 @@
-use backtrace::Backtrace;
-
-use std::sync::Mutex;
 use std::path::Path;
+use std::sync::Mutex;
 
+use backtrace::Backtrace;
 
 struct Inner {
     backtrace: Option<Backtrace>,
