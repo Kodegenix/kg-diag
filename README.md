@@ -1,6 +1,6 @@
 # kg-diag
 
-[![Build Status](https://travis-ci.com/Kodegenix/kg-diag.svg?branch=master)](https://travis-ci.com/Kodegenix/kg-diag)
+[![Build Status](https://travis-ci.org/Kodegenix/kg-diag.svg?branch=master)](https://travis-ci.org/Kodegenix/kg-diag)
 
 Set of crates for alternative user story for error/diagnostic management.
 
