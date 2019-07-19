@@ -1,11 +1,11 @@
-#![feature(box_syntax, specialization, rustc_private, raw, test)]
+#![feature(box_syntax, specialization, raw)]
 
 #[macro_use]
 extern crate kg_display_derive;
 
 pub use self::detail::{Detail, Severity};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
-pub use self::io::{LexTerm, LexToken, Position, Quote};
+pub use self::io::{LexTerm, LexToken, Position, Span, Quote};
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
 

@@ -2,7 +2,7 @@ use std;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Position {
     pub offset: usize,
     pub line: u32,
@@ -43,11 +43,43 @@ impl Default for Position {
     }
 }
 
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct Span {
+    pub from: Position,
+    pub to: Position,
+}
+
+impl Span {
+    pub fn new() -> Span {
+        Span {
+            from: Position::new(),
+            to: Position::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if f.alternate() || self.from.line != self.to.line {
+            write!(f, "{}-{}", self.from, self.to)
+        } else {
+            write!(f, "{}:{}-{}", self.from.line + 1, self.from.column + 1, self.to.column + 1)
+        }
+    }
+}
+
+impl Default for Span {
+    fn default() -> Span {
+        Span::new()
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct Quote {
     path: Option<PathBuf>,
-    from: Position,
-    to: Position,
+    span: Span,
     offset: usize,
     line: u32,
     source: String,
@@ -91,8 +123,10 @@ impl Quote {
 
         Quote {
             path: path.map(|p| p.to_path_buf()),
-            from,
-            to,
+            span: Span {
+                from,
+                to,
+            },
             offset: off1,
             line,
             source: String::from_utf8_lossy(&data[off1..off2]).into(),
@@ -101,11 +135,15 @@ impl Quote {
     }
 
     pub fn from(&self) -> Position {
-        self.from
+        self.span.from
     }
 
     pub fn to(&self) -> Position {
-        self.to
+        self.span.to
+    }
+
+    pub fn span(&self) -> Span {
+        self.span
     }
 
     pub fn message(&self) -> &str {
@@ -137,21 +175,21 @@ impl std::fmt::Display for Quote {
         };
         let mut ln = self.line;
         if self.path.is_some() {
-            write!(f, "{0:>1$} {2}:{3}\n", " -->", line_chars, self.path.as_ref().unwrap().to_str().unwrap(), self.from)?;
+            write!(f, "{0:>1$} {2}:{3}\n", " -->", line_chars, self.path.as_ref().unwrap().to_str().unwrap(), self.span.from)?;
         }
         for s in self.source.lines() {
             if show_line_numbers {
                 write!(f, "{0:>1$}| ", ln + 1, line_chars)?;
             }
-            if ln >= self.from.line && ln <= self.to.line {
+            if ln >= self.span.from.line && ln <= self.span.to.line {
                 write!(f, "{}\n", s)?;
                 if show_line_numbers {
                     write!(f, "{0:1$}| ", " ", line_chars)?;
                 }
-                for _ in 0..self.from.column {
+                for _ in 0..self.span.from.column {
                     write!(f, " ")?;
                 }
-                for _ in self.from.column..self.to.column {
+                for _ in self.span.from.column..self.span.to.column {
                     write!(f, "^")?;
                 }
                 write!(f, " {}\n", self.message)?;
@@ -174,16 +212,17 @@ pub trait LexTerm: std::fmt::Debug + std::fmt::Display + PartialEq + Eq + Sync +
 #[display(fmt = "{term}")]
 pub struct LexToken<T: LexTerm + Clone + Copy> {
     term: T,
-    from: Position,
-    to: Position,
+    span: Span,
 }
 
 impl<T: LexTerm + Clone + Copy> LexToken<T> {
     pub fn new(term: T, from: Position, to: Position) -> LexToken<T> {
         LexToken {
             term,
-            from,
-            to,
+            span: Span {
+                from,
+                to,
+            },
         }
     }
 
@@ -192,10 +231,14 @@ impl<T: LexTerm + Clone + Copy> LexToken<T> {
     }
 
     pub fn from(&self) -> Position {
-        self.from
+        self.span.from
     }
 
     pub fn to(&self) -> Position {
-        self.to
+        self.span.to
+    }
+
+    pub fn span(&self) -> Span {
+        self.span
     }
 }
