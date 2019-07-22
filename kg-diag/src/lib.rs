@@ -54,6 +54,17 @@ macro_rules! parse_diag {
     }};
 }
 
+pub trait ResultExt<T> {
+    fn into_diag(self) -> Result<T, BasicDiag>;
+}
+
+impl<T, E: Detail> ResultExt<T> for Result<T, E> {
+    fn into_diag(self) -> Result<T, BasicDiag> {
+        self.map_err(|detail| BasicDiag::from(detail))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
