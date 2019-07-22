@@ -291,12 +291,12 @@ impl<'a> Reader for MemCharReader<'a> {
         Some(self.data.len())
     }
 
-    fn position(&self) -> Position {
-        self.pos
-    }
-
     fn eof(&self) -> bool {
         self.pos.offset >= self.data.len()
+    }
+
+    fn position(&self) -> Position {
+        self.pos
     }
 
     fn seek(&mut self, pos: Position) -> ParseResult<()> {
@@ -491,12 +491,12 @@ impl<'a> Reader for MemByteReader<'a> {
         Some(self.data.len())
     }
 
-    fn position(&self) -> Position {
-        self.pos
-    }
-
     fn eof(&self) -> bool {
         self.pos.offset >= self.data.len()
+    }
+
+    fn position(&self) -> Position {
+        self.pos
     }
 
     fn seek(&mut self, pos: Position) -> ParseResult<()> {

@@ -195,7 +195,7 @@ impl std::fmt::Display for Quote {
             if show_line_numbers {
                 write!(f, "{0:>1$}| ", ln + 1, line_chars)?;
             }
-            if ln >= self.span.from.line && ln <= self.span.to.line {
+            if ln == self.span.from.line && ln == self.span.to.line {
                 write!(f, "{}\n", s)?;
                 if show_line_numbers {
                     write!(f, "{0:1$}| ", " ", line_chars)?;
