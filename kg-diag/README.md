@@ -3,7 +3,7 @@
 [![Latest Version](https://img.shields.io/crates/v/kg-diag.svg)](https://crates.io/crates/kg-diag)
 [![Documentation](https://docs.rs/kg-diag/badge.svg)](https://docs.rs/kg-diag)
 
-Error and diagnostics management.
+Error/diagnostic management. I/O routines for reading UTF-8 textual data with position tracking.
 
 ## License
 

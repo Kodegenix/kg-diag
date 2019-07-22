@@ -2,14 +2,20 @@
 
 #[macro_use]
 extern crate kg_display_derive;
+#[macro_use]
+extern crate serde_derive;
 
 pub use self::detail::{Detail, Severity};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
-pub use self::io::{LexTerm, LexToken, Position, Span, Quote};
+pub use self::io::{
+    LexTerm, LexToken, Position, Span, Quote,
+    ByteReader, MemByteReader, CharReader, MemCharReader, Reader, FileBuffer,
+    IoError, IoResult, ParseResult, FileType, OpType,
+};
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
 
-mod io;
+pub mod io;
 mod detail;
 mod diag;
 mod multi;

@@ -1,9 +1,9 @@
 [package]
 name = "kg-diag"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 description = """
-Error/diagnostic management
+Error/diagnostic management. I/O routines for reading UTF-8 textual data with position tracking.
 """
 readme = "README.md"
 license = "Apache-2.0 OR MIT"
@@ -14,5 +14,9 @@ edition = "2018"
 [dependencies]
 kg-display-derive = "0.1.1"
 backtrace = "0.3.32"
+serde = "1.0.97"
+serde_derive = "1.0.97"
 
-
+[dev-dependencies]
+assert_approx_eq = "1.1.0"
+tempfile = "3.1.0"
