@@ -1,15 +1,21 @@
-#![feature(box_syntax, specialization, rustc_private, raw, test)]
+#![feature(box_syntax, specialization, raw)]
 
 #[macro_use]
 extern crate kg_display_derive;
+#[macro_use]
+extern crate serde_derive;
 
 pub use self::detail::{Detail, Severity};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
-pub use self::io::{LexTerm, LexToken, Position, Quote};
+pub use self::io::{
+    LexTerm, LexToken, Position, Span, Quote,
+    ByteReader, MemByteReader, CharReader, MemCharReader, Reader, FileBuffer,
+    IoError, IoResult, ParseResult, FileType, OpType,
+};
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
 
-mod io;
+pub mod io;
 mod detail;
 mod diag;
 mod multi;
@@ -53,6 +59,17 @@ macro_rules! parse_diag {
         e
     }};
 }
+
+pub trait ResultExt<T> {
+    fn into_diag(self) -> Result<T, BasicDiag>;
+}
+
+impl<T, E: Detail> ResultExt<T> for Result<T, E> {
+    fn into_diag(self) -> Result<T, BasicDiag> {
+        self.map_err(|detail| BasicDiag::from(detail))
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

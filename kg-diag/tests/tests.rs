@@ -1,10 +1,6 @@
 #![feature(specialization)]
 
-#[macro_use]
-extern crate kg_diag;
-
-use kg_diag::{Detail, Diag};
-use kg_io::*;
+use kg_diag::*;
 
 #[derive(Debug)]
 enum TestErrorKind {
