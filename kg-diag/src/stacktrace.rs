@@ -19,11 +19,19 @@ impl Inner {
             let mut first = None;
             for (i, f) in frames.iter().enumerate() {
                 if first.is_none() {
-                    if f.symbols().iter().find(|s| s.filename() == Some(this_file)).is_some() {
+                    if f.symbols()
+                        .iter()
+                        .find(|s| s.filename() == Some(this_file))
+                        .is_some()
+                    {
                         first = Some(i);
                     }
                 } else {
-                    if f.symbols().iter().find(|s| s.filename() == Some(this_file)).is_some() {
+                    if f.symbols()
+                        .iter()
+                        .find(|s| s.filename() == Some(this_file))
+                        .is_some()
+                    {
                         first = Some(i);
                     } else {
                         break;
@@ -35,18 +43,27 @@ impl Inner {
             }
             let mut last = None;
             for (mut i, f) in frames.iter().enumerate() {
-                if f.symbols().iter().find(|s| if let Some(n) = s.name().map(|n| n.as_str().unwrap_or("")) {
-                    if n.starts_with("_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$") {
-                        true
-                    } else if n.starts_with("_ZN4test8run_test28_$u7b$$u7b$closure$u7d$$u7d$") {
-                        i -= 1;
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }).is_some() {
+                if f.symbols()
+                    .iter()
+                    .find(|s| {
+                        if let Some(n) = s.name().map(|n| n.as_str().unwrap_or("")) {
+                            if n.starts_with("_ZN3std2rt10lang_start28_$u7b$$u7b$closure$u7d$$u7d$")
+                            {
+                                true
+                            } else if n
+                                .starts_with("_ZN4test8run_test28_$u7b$$u7b$closure$u7d$$u7d$")
+                            {
+                                i -= 1;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                    .is_some()
+                {
                     last = Some(i);
                     break;
                 }
@@ -61,7 +78,6 @@ impl Inner {
         self.backtrace.as_ref().unwrap()
     }
 }
-
 
 pub struct Stacktrace(Mutex<Inner>);
 
@@ -98,10 +114,12 @@ impl std::fmt::Debug for Stacktrace {
 
         let inner = self.0.lock().unwrap();
         f.debug_struct("Stacktrace")
-            .field("backtrace", &inner.backtrace.as_ref().map(|b| BacktraceDebug(b)))
+            .field(
+                "backtrace",
+                &inner.backtrace.as_ref().map(|b| BacktraceDebug(b)),
+            )
             .field("resolved", &inner.resolved)
             .field("skip", &inner.skip)
             .finish()
     }
 }
-

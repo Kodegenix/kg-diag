@@ -22,16 +22,20 @@ impl Detail for InvalidToken {
 
 impl std::fmt::Display for InvalidToken {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "invalid token '{}', expected one of {:?}", self.found, self.expected)
+        write!(
+            f,
+            "invalid token '{}', expected one of {:?}",
+            self.found, self.expected
+        )
     }
 }
-
 
 fn error_fun() -> Result<(), SimpleDiag> {
     Err(InvalidToken {
         expected: &["id", "num", "+", "-"],
         found: "*".into(),
-    }.into())
+    }
+    .into())
 }
 
 fn main() {

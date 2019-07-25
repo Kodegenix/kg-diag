@@ -8,16 +8,15 @@ extern crate serde_derive;
 pub use self::detail::{Detail, Severity};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
 pub use self::io::{
-    LexTerm, LexToken, Position, Span, Quote,
-    ByteReader, MemByteReader, CharReader, MemCharReader, Reader, FileBuffer,
-    IoError, IoResult, ParseResult, FileType, OpType,
+    ByteReader, CharReader, FileBuffer, FileType, IoError, IoResult, LexTerm, LexToken,
+    MemByteReader, MemCharReader, OpType, ParseResult, Position, Quote, Reader, Span,
 };
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
 
-pub mod io;
 mod detail;
 mod diag;
+pub mod io;
 mod multi;
 mod stacktrace;
 
@@ -70,7 +69,6 @@ impl<T, E: Detail> ResultExt<T> for Result<T, E> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,17 +93,21 @@ mod tests {
 
         impl std::fmt::Display for InvalidToken {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "invalid token '{}', expected one of {:?}", self.found, self.expected)
+                write!(
+                    f,
+                    "invalid token '{}', expected one of {:?}",
+                    self.found, self.expected
+                )
             }
         }
 
         let err: ParseDiag = InvalidToken {
             expected: &["id", "num", "+", "-"],
             found: "*".into(),
-        }.into();
+        }
+        .into();
 
         println!("{:#?}", err);
         println!("{}", err);
     }
 }
-

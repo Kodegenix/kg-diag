@@ -39,7 +39,6 @@ fn static_scan<R: CharReader>(r: &mut R) -> ParseResult<usize> {
     Ok(count)
 }
 
-
 #[bench]
 fn dyn_dispatch(b: &mut Bencher) {
     let s = make_string();

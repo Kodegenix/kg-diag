@@ -31,7 +31,7 @@ pub enum IoError {
 }
 
 impl IoError {
-    pub fn kind(&self)-> std::io::ErrorKind {
+    pub fn kind(&self) -> std::io::ErrorKind {
         match *self {
             IoError::Io { kind } => kind,
             IoError::IoPath { kind, .. } => kind,
@@ -42,7 +42,7 @@ impl IoError {
             IoError::Fmt => std::io::ErrorKind::Other,
         }
     }
-    pub fn file_not_found(path: PathBuf, op_type: OpType)-> IoError {
+    pub fn file_not_found(path: PathBuf, op_type: OpType) -> IoError {
         IoError::IoPath {
             kind: std::io::ErrorKind::NotFound,
             file_type: FileType::File,
@@ -57,8 +57,8 @@ impl Detail for IoError {
         match *self {
             IoError::Io { kind } => 1 + kind as u32,
             IoError::IoPath { kind, .. } => 1 + kind as u32,
-            IoError::CurrentDirGet {kind} => 1 + kind as u32,
-            IoError::CurrentDirSet {kind, .. } => 1 + kind as u32,
+            IoError::CurrentDirGet { kind } => 1 + kind as u32,
+            IoError::CurrentDirSet { kind, .. } => 1 + kind as u32,
             IoError::Utf8UnexpectedEof { .. } => 20,
             IoError::Utf8InvalidEncoding { .. } => 21,
             IoError::Fmt => 22,
@@ -96,19 +96,40 @@ impl std::fmt::Display for IoError {
             IoError::Io { kind } => {
                 write!(f, "{}", kind_str(kind))?;
             }
-            IoError::IoPath { kind, op_type, file_type, ref path } => {
-                write!(f, "cannot {} {} '{}': {}", op_type, file_type, path.display(), kind_str(kind))?;
+            IoError::IoPath {
+                kind,
+                op_type,
+                file_type,
+                ref path,
+            } => {
+                write!(
+                    f,
+                    "cannot {} {} '{}': {}",
+                    op_type,
+                    file_type,
+                    path.display(),
+                    kind_str(kind)
+                )?;
             }
             IoError::CurrentDirGet { kind } => {
                 write!(f, "cannot get current dir: {}", kind_str(kind))?;
             }
             IoError::CurrentDirSet { kind, ref path } => {
-                write!(f, "cannot set current dir to {}: {}", path.display(), kind_str(kind))?;
+                write!(
+                    f,
+                    "cannot set current dir to {}: {}",
+                    path.display(),
+                    kind_str(kind)
+                )?;
             }
             IoError::Utf8UnexpectedEof { offset, .. } => {
-                write!(f, "unexpected end of input at offset {} while decoding utf-8", offset)?;
+                write!(
+                    f,
+                    "unexpected end of input at offset {} while decoding utf-8",
+                    offset
+                )?;
             }
-            IoError::Utf8InvalidEncoding { offset, ..} => {
+            IoError::Utf8InvalidEncoding { offset, .. } => {
                 write!(f, "invalid utf-8 encoding at offset {}", offset)?;
             }
             IoError::Fmt => {
@@ -137,7 +158,6 @@ impl From<std::fmt::Error> for IoError {
     }
 }
 
-
 pub trait ResultExt<T> {
     fn info<P: Into<PathBuf>>(self, path: P, op_type: OpType, file_type: FileType) -> IoResult<T>;
 }
@@ -147,14 +167,12 @@ impl<T> ResultExt<T> for std::io::Result<T> {
     fn info<P: Into<PathBuf>>(self, path: P, op_type: OpType, file_type: FileType) -> IoResult<T> {
         match self {
             Ok(value) => Ok(value),
-            Err(err) => {
-                Err(IoError::IoPath {
-                    kind: err.kind(),
-                    op_type,
-                    file_type,
-                    path: path.into(),
-                })
-            }
+            Err(err) => Err(IoError::IoPath {
+                kind: err.kind(),
+                op_type,
+                file_type,
+                path: path.into(),
+            }),
         }
     }
 }

@@ -39,11 +39,14 @@ impl dyn Diag {
 
     fn display(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let d = self.detail();
-        write!(f, "{} [{}{:04}]: {}\n",
-               d.severity(),
-               d.severity().code_char(),
-               d.code(),
-               d)?;
+        write!(
+            f,
+            "{} [{}{:04}]: {}\n",
+            d.severity(),
+            d.severity().code_char(),
+            d.code(),
+            d
+        )?;
         if let Some(parse_diag) = self.downcast_ref::<ParseDiag>() {
             for q in parse_diag.quotes().iter() {
                 std::fmt::Display::fmt(q, f)?;
@@ -81,7 +84,6 @@ default impl<T: Detail> Diag for T {
     }
 }
 
-
 #[derive(Debug)]
 pub struct BasicDiag {
     detail: DetailHolder,
@@ -114,7 +116,11 @@ impl BasicDiag {
         }
     }
 
-    pub fn with_cause_stacktrace<T: Detail, E: Diag>(detail: T, cause: E, stacktrace: Stacktrace) -> BasicDiag {
+    pub fn with_cause_stacktrace<T: Detail, E: Diag>(
+        detail: T,
+        cause: E,
+        stacktrace: Stacktrace,
+    ) -> BasicDiag {
         BasicDiag {
             cause: Some(Box::new(cause)),
             stacktrace: Some(Box::new(stacktrace)),
@@ -165,7 +171,6 @@ impl Display for BasicDiag {
     }
 }
 
-
 const INPLACE_SIZE: usize = 40;
 
 enum DetailHolder {
@@ -179,7 +184,6 @@ enum DetailHolder {
 unsafe impl Send for DetailHolder {}
 
 unsafe impl Sync for DetailHolder {}
-
 
 impl DetailHolder {
     #[inline(always)]
@@ -208,18 +212,14 @@ impl DetailHolder {
 impl AsRef<dyn Detail> for DetailHolder {
     fn as_ref(&self) -> &dyn Detail {
         match self {
-            &DetailHolder::Inplace { vtable, ref data } => {
-                unsafe {
-                    let ptr = TraitObject {
-                        data: std::mem::transmute(data),
-                        vtable,
-                    };
-                    std::mem::transmute(ptr)
-                }
-            }
-            &DetailHolder::Ref(ref detail) => {
-                detail.as_ref()
-            }
+            &DetailHolder::Inplace { vtable, ref data } => unsafe {
+                let ptr = TraitObject {
+                    data: std::mem::transmute(data),
+                    vtable,
+                };
+                std::mem::transmute(ptr)
+            },
+            &DetailHolder::Ref(ref detail) => detail.as_ref(),
         }
     }
 }
@@ -227,25 +227,21 @@ impl AsRef<dyn Detail> for DetailHolder {
 impl AsMut<dyn Detail> for DetailHolder {
     fn as_mut(&mut self) -> &mut dyn Detail {
         match self {
-            &mut DetailHolder::Inplace { vtable, ref data } => {
-                unsafe {
-                    let ptr = TraitObject {
-                        data: std::mem::transmute(data),
-                        vtable,
-                    };
-                    std::mem::transmute(ptr)
-                }
-            }
-            &mut DetailHolder::Ref(ref mut detail) => {
-                detail.as_mut()
-            }
+            &mut DetailHolder::Inplace { vtable, ref data } => unsafe {
+                let ptr = TraitObject {
+                    data: std::mem::transmute(data),
+                    vtable,
+                };
+                std::mem::transmute(ptr)
+            },
+            &mut DetailHolder::Ref(ref mut detail) => detail.as_mut(),
         }
     }
 }
 
 impl Drop for DetailHolder {
     fn drop(&mut self) {
-        if let &mut DetailHolder::Inplace {..} = self {
+        if let &mut DetailHolder::Inplace { .. } = self {
             let detail = self.as_mut() as *mut dyn Detail;
             unsafe {
                 std::ptr::drop_in_place(detail);
@@ -257,16 +253,17 @@ impl Drop for DetailHolder {
 impl Debug for DetailHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            DetailHolder::Inplace {..} => {
-                f.debug_tuple("Inplace").field(self.as_ref().as_fmt_debug()).finish()
-            }
-            DetailHolder::Ref(..) => {
-                f.debug_tuple("Ref").field(self.as_ref().as_fmt_debug()).finish()
-            }
+            DetailHolder::Inplace { .. } => f
+                .debug_tuple("Inplace")
+                .field(self.as_ref().as_fmt_debug())
+                .finish(),
+            DetailHolder::Ref(..) => f
+                .debug_tuple("Ref")
+                .field(self.as_ref().as_fmt_debug())
+                .finish(),
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct SimpleDiag {
@@ -300,7 +297,11 @@ impl SimpleDiag {
         }
     }
 
-    pub fn with_cause_stacktrace<T: Detail, E: Diag>(detail: T, cause: E, stacktrace: Stacktrace) -> SimpleDiag {
+    pub fn with_cause_stacktrace<T: Detail, E: Diag>(
+        detail: T,
+        cause: E,
+        stacktrace: Stacktrace,
+    ) -> SimpleDiag {
         SimpleDiag {
             detail: box detail,
             cause: Some(Box::new(cause)),
@@ -351,7 +352,6 @@ impl Display for SimpleDiag {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ParseDiag {
     detail: Box<dyn Detail>,
@@ -388,7 +388,11 @@ impl ParseDiag {
         }
     }
 
-    pub fn with_cause_stacktrace<T: Detail, E: Diag>(detail: T, cause: E, stacktrace: Stacktrace) -> ParseDiag {
+    pub fn with_cause_stacktrace<T: Detail, E: Diag>(
+        detail: T,
+        cause: E,
+        stacktrace: Stacktrace,
+    ) -> ParseDiag {
         ParseDiag {
             detail: box detail,
             quotes: Vec::new(),

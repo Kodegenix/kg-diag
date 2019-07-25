@@ -15,7 +15,6 @@ use std;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Position {
     pub offset: usize,
@@ -30,6 +29,13 @@ impl Position {
             offset: 0,
             line: 0,
             column: 0,
+        }
+    }
+    pub fn with(offset: usize, line: u32, column: u32) -> Position {
+        Position {
+            offset,
+            line,
+            column,
         }
     }
 
@@ -57,7 +63,6 @@ impl Default for Position {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Span {
     pub from: Position,
@@ -71,6 +76,22 @@ impl Span {
             to: Position::new(),
         }
     }
+    pub fn with(
+        f_offset: usize,
+        f_line: u32,
+        f_column: u32,
+        t_offset: usize,
+        t_line: u32,
+        t_column: u32,
+    ) -> Span {
+        let from = Position::with(f_offset, f_line, f_column);
+        let to = Position::with(t_offset, t_line, t_column);
+
+        Span { from, to }
+    }
+    pub fn with_pos(from: Position, to: Position) -> Span {
+        Span { from, to }
+    }
 }
 
 impl std::fmt::Display for Span {
@@ -78,7 +99,13 @@ impl std::fmt::Display for Span {
         if f.alternate() || self.from.line != self.to.line {
             write!(f, "{}-{}", self.from, self.to)
         } else {
-            write!(f, "{}:{}-{}", self.from.line + 1, self.from.column + 1, self.to.column + 1)
+            write!(
+                f,
+                "{}:{}-{}",
+                self.from.line + 1,
+                self.from.column + 1,
+                self.to.column + 1
+            )
         }
     }
 }
@@ -88,7 +115,6 @@ impl Default for Span {
         Span::new()
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Quote {
@@ -102,8 +128,15 @@ pub struct Quote {
 
 #[allow(unused)]
 impl Quote {
-    pub fn new<'a>(path: Option<&Path>, data: &[u8], from: Position, to: Position,
-                   lines_before: u32, lines_after: u32, message: Cow<'a, str>) -> Quote {
+    pub fn new<'a>(
+        path: Option<&Path>,
+        data: &[u8],
+        from: Position,
+        to: Position,
+        lines_before: u32,
+        lines_after: u32,
+        message: Cow<'a, str>,
+    ) -> Quote {
         let mut line = 0;
         let mut off1 = 0;
         let mut off2 = data.len();
@@ -137,10 +170,7 @@ impl Quote {
 
         Quote {
             path: path.map(|p| p.to_path_buf()),
-            span: Span {
-                from,
-                to,
-            },
+            span: Span { from, to },
             offset: off1,
             line,
             source: String::from_utf8_lossy(&data[off1..off2]).into(),
@@ -183,13 +213,25 @@ impl std::fmt::Display for Quote {
 
         let show_line_numbers = self.path.is_some() || self.line != 0 || self.source.len() > 1;
         let line_chars = if show_line_numbers {
-            cmp::max(((self.line + self.source.len() as u32 + 1) as f64).log10().ceil() as usize, 3)
+            cmp::max(
+                ((self.line + self.source.len() as u32 + 1) as f64)
+                    .log10()
+                    .ceil() as usize,
+                3,
+            )
         } else {
             0
         };
         let mut ln = self.line;
         if self.path.is_some() {
-            write!(f, "{0:>1$} {2}:{3}\n", " -->", line_chars, self.path.as_ref().unwrap().to_str().unwrap(), self.span.from)?;
+            write!(
+                f,
+                "{0:>1$} {2}:{3}\n",
+                " -->",
+                line_chars,
+                self.path.as_ref().unwrap().to_str().unwrap(),
+                self.span.from
+            )?;
         }
         for s in self.source.lines() {
             if show_line_numbers {
@@ -216,10 +258,11 @@ impl std::fmt::Display for Quote {
     }
 }
 
-
 /// Marker trait representing terminals used in parsing
-pub trait LexTerm: std::fmt::Debug + std::fmt::Display + PartialEq + Eq + Sync + Send + 'static {}
-
+pub trait LexTerm:
+    std::fmt::Debug + std::fmt::Display + PartialEq + Eq + Sync + Send + 'static
+{
+}
 
 /// Generic token structure (i.e. terminal along with it's location in source)
 #[derive(Debug, Display, Clone, Copy)]
@@ -233,10 +276,7 @@ impl<T: LexTerm + Clone + Copy> LexToken<T> {
     pub fn new(term: T, from: Position, to: Position) -> LexToken<T> {
         LexToken {
             term,
-            span: Span {
-                from,
-                to,
-            },
+            span: Span { from, to },
         }
     }
 

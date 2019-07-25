@@ -1,6 +1,6 @@
 [package]
 name = "kg-diag"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 description = """
 Error/diagnostic management. I/O routines for reading UTF-8 textual data with position tracking.

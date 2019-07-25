@@ -1,5 +1,5 @@
-use std::fs::{File, Metadata, OpenOptions};
 use std::fs::ReadDir;
+use std::fs::{File, Metadata, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -16,7 +16,6 @@ pub enum OpType {
     #[display(fmt = "remove")]
     Remove,
 }
-
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -49,7 +48,6 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-
 #[derive(Debug)]
 pub struct FileBuffer {
     data: Vec<u8>,
@@ -58,9 +56,9 @@ pub struct FileBuffer {
 
 impl FileBuffer {
     pub fn open<P: Into<PathBuf> + AsRef<Path>>(path: P) -> IoResult<FileBuffer> {
-        let mut f = File::open(path.as_ref())
-            .info(path.as_ref(), OpType::Read, FileType::File)?;
-        let m = f.metadata()
+        let mut f = File::open(path.as_ref()).info(path.as_ref(), OpType::Read, FileType::File)?;
+        let m = f
+            .metadata()
             .info(path.as_ref(), OpType::Read, FileType::File)?;
         let mut data: Vec<u8> = Vec::with_capacity(m.len() as usize);
         f.read_to_end(&mut data)
@@ -72,7 +70,11 @@ impl FileBuffer {
     }
 
     pub fn create<P: Into<PathBuf> + AsRef<Path>>(path: P) -> IoResult<FileBuffer> {
-        OpenOptions::new().create(true).truncate(true).write(true).open(path.as_ref())
+        OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(path.as_ref())
             .info(path.as_ref(), OpType::Create, FileType::File)?;
         Ok(FileBuffer {
             data: Vec::new(),
@@ -94,7 +96,11 @@ impl FileBuffer {
 
     pub fn write(&mut self, data: &[u8]) -> IoResult<()> {
         self.data = data.to_owned();
-        let mut f = OpenOptions::new().create(true).truncate(true).write(true).open(&self.path)
+        let mut f = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&self.path)
             .info(&self.path, OpType::Write, FileType::File)?;
         f.write(&self.data)
             .info(&self.path, OpType::Write, FileType::File)?;
@@ -102,31 +108,40 @@ impl FileBuffer {
             .info(&self.path, OpType::Write, FileType::File)?;
         Ok(())
     }
-
 }
 
-pub fn read_to_string<P: AsRef<Path>>(file_path: P, buf: &mut String)-> IoResult<()>  {
-    let mut f = File::open(file_path.as_ref()).info(file_path.as_ref(), OpType::Read, FileType::File)?;
-    buf.reserve_exact(f.metadata().info(file_path.as_ref(), OpType::Read, FileType::File)?.len() as usize);
-    f.read_to_string(buf).info(file_path.as_ref(), OpType::Read, FileType::File)?;
+pub fn read_to_string<P: AsRef<Path>>(file_path: P, buf: &mut String) -> IoResult<()> {
+    let mut f =
+        File::open(file_path.as_ref()).info(file_path.as_ref(), OpType::Read, FileType::File)?;
+    buf.reserve_exact(
+        f.metadata()
+            .info(file_path.as_ref(), OpType::Read, FileType::File)?
+            .len() as usize,
+    );
+    f.read_to_string(buf)
+        .info(file_path.as_ref(), OpType::Read, FileType::File)?;
     Ok(())
 }
 
-pub fn read_string<P: AsRef<Path>>(file_path: P)-> IoResult<String>  {
+pub fn read_string<P: AsRef<Path>>(file_path: P) -> IoResult<String> {
     let mut s = String::new();
     read_to_string(file_path, &mut s)?;
     Ok(s)
 }
 
 pub fn canonicalize<P: AsRef<Path>>(file_path: P) -> IoResult<PathBuf> {
-    Ok(std::fs::canonicalize(file_path.as_ref()).info(file_path.as_ref(), OpType::Read, FileType::Unknown)?)
+    Ok(std::fs::canonicalize(file_path.as_ref()).info(
+        file_path.as_ref(),
+        OpType::Read,
+        FileType::Unknown,
+    )?)
 }
 
 pub fn current_dir() -> IoResult<PathBuf> {
-    match std::env::current_dir(){
+    match std::env::current_dir() {
         Ok(dir) => Ok(dir),
-        Err(err)=> {
-            let e = IoError::CurrentDirGet {kind: err.kind()};
+        Err(err) => {
+            let e = IoError::CurrentDirGet { kind: err.kind() };
             Err(e)
         }
     }
@@ -157,7 +172,8 @@ pub fn create_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
                 path: p.into(),
                 op_type: OpType::Create,
                 file_type: FileType::Dir,
-            }.into());
+            }
+            .into());
         }
     }
     Ok(())
@@ -187,7 +203,15 @@ mod tests {
     #[test]
     fn canonicalize() {
         let err = fs::canonicalize("./should_not_exist").unwrap_err();
-        assert_eq!(err , error::IoError::IoPath {kind: std::io::ErrorKind::NotFound, op_type: OpType::Read, file_type: FileType::Unknown, path: std::path::PathBuf::from("./should_not_exist")});
+        assert_eq!(
+            err,
+            error::IoError::IoPath {
+                kind: std::io::ErrorKind::NotFound,
+                op_type: OpType::Read,
+                file_type: FileType::Unknown,
+                path: std::path::PathBuf::from("./should_not_exist")
+            }
+        );
     }
 
     #[test]
@@ -195,14 +219,22 @@ mod tests {
         use std::io::{Seek, SeekFrom};
         use tempfile::NamedTempFile;
 
-        let mut tmpfile  = NamedTempFile::new().unwrap();
+        let mut tmpfile = NamedTempFile::new().unwrap();
         tmpfile.write_all(b"\xe2\x28\xa1").unwrap();
         tmpfile.seek(SeekFrom::Start(0)).unwrap();
 
         let mut s = String::new();
         let path = tmpfile.path();
         let err = fs::read_to_string(path, &mut s).unwrap_err();
-        assert_eq!(err , error::IoError::IoPath {kind: std::io::ErrorKind::InvalidData, op_type: OpType::Read,file_type: FileType::File, path: std::path::PathBuf::from(path)});
+        assert_eq!(
+            err,
+            error::IoError::IoPath {
+                kind: std::io::ErrorKind::InvalidData,
+                op_type: OpType::Read,
+                file_type: FileType::File,
+                path: std::path::PathBuf::from(path)
+            }
+        );
     }
 
     #[test]
@@ -213,7 +245,12 @@ mod tests {
         std::env::set_current_dir(&s).unwrap();
         std::fs::remove_dir(s).unwrap();
         let err = fs::current_dir().unwrap_err();
-        assert_eq!(err , error::IoError::CurrentDirGet {kind: std::io::ErrorKind::NotFound});
+        assert_eq!(
+            err,
+            error::IoError::CurrentDirGet {
+                kind: std::io::ErrorKind::NotFound
+            }
+        );
         std::env::set_current_dir(&path).unwrap();
     }
 }

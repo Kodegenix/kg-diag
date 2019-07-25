@@ -28,9 +28,15 @@ pub trait Reader {
         self.seek(Default::default())
     }
 
-    fn quote(&mut self, from: Position, to: Position, lines_before: u32, lines_after: u32, message: Cow<str>) -> Quote;
+    fn quote(
+        &mut self,
+        from: Position,
+        to: Position,
+        lines_before: u32,
+        lines_after: u32,
+        message: Cow<str>,
+    ) -> Quote;
 }
-
 
 pub trait ByteReader: Reader {
     fn next_byte(&mut self) -> ParseResult<Option<u8>>;
@@ -41,7 +47,6 @@ pub trait ByteReader: Reader {
 
     fn skip_bytes(&mut self, skip: usize) -> ParseResult<()>;
 }
-
 
 pub trait CharReader: Reader {
     fn next_char(&mut self) -> ParseResult<Option<char>>;
@@ -56,7 +61,11 @@ pub trait CharReader: Reader {
 
     fn match_str_term(&mut self, s: &str, f: &dyn Fn(Option<char>) -> bool) -> ParseResult<bool>;
 
-    fn match_str_term_mut(&mut self, s: &str, f: &mut dyn FnMut(Option<char>) -> bool) -> ParseResult<bool>;
+    fn match_str_term_mut(
+        &mut self,
+        s: &str,
+        f: &mut dyn FnMut(Option<char>) -> bool,
+    ) -> ParseResult<bool>;
 
     fn match_char(&mut self, c: char) -> ParseResult<bool> {
         if let Some(k) = self.peek_char(0)? {
@@ -159,7 +168,6 @@ pub trait CharReader: Reader {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct MemCharReader<'a> {
     path: Option<&'a Path>,
@@ -180,7 +188,10 @@ impl<'a> MemCharReader<'a> {
         }
     }
 
-    pub fn with_path<P: AsRef<Path> + ?Sized + 'a>(path: &'a P, input: &'a [u8]) -> MemCharReader<'a> {
+    pub fn with_path<P: AsRef<Path> + ?Sized + 'a>(
+        path: &'a P,
+        input: &'a [u8],
+    ) -> MemCharReader<'a> {
         MemCharReader {
             path: Some(path.as_ref()),
             data: input,
@@ -195,28 +206,17 @@ impl<'a> MemCharReader<'a> {
         let mut e: ParseDiag = IoError::Utf8InvalidEncoding {
             offset: p.offset,
             len,
-        }.into();
-        let q = self.quote(
-            p,
-            p,
-            2,
-            2,
-            "illegal utf-8 encoding".into());
+        }
+        .into();
+        let q = self.quote(p, p, 2, 2, "illegal utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
     }
 
     fn eof_err<T>(&mut self) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8UnexpectedEof {
-            offset: p.offset,
-        }.into();
-        let q = self.quote(
-            p,
-            p,
-            2,
-            2,
-            "end of input at utf-8 encoding".into());
+        let mut e: ParseDiag = IoError::Utf8UnexpectedEof { offset: p.offset }.into();
+        let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
     }
@@ -250,8 +250,9 @@ impl<'a> MemCharReader<'a> {
                 }
                 self.len = 2;
                 let b1 = self.data.get_unchecked(i + 1);
-                self.c = char::from_u32_unchecked(((b & 0b00011111u8) as u32).wrapping_shl(6)
-                    + (b1 & 0b00111111u8) as u32);
+                self.c = char::from_u32_unchecked(
+                    ((b & 0b00011111u8) as u32).wrapping_shl(6) + (b1 & 0b00111111u8) as u32,
+                );
             } else if b < 0b11110000u8 {
                 if len < i + 2 {
                     return self.eof_err();
@@ -259,9 +260,11 @@ impl<'a> MemCharReader<'a> {
                 self.len = 3;
                 let b1 = self.data.get_unchecked(i + 1);
                 let b2 = self.data.get_unchecked(i + 2);
-                self.c = char::from_u32_unchecked(((b & 0b00001111u8) as u32).wrapping_shl(12)
-                    + ((b1 & 0b00111111u8) as u32).wrapping_shl(6)
-                    + (b2 & 0b00111111u8) as u32);
+                self.c = char::from_u32_unchecked(
+                    ((b & 0b00001111u8) as u32).wrapping_shl(12)
+                        + ((b1 & 0b00111111u8) as u32).wrapping_shl(6)
+                        + (b2 & 0b00111111u8) as u32,
+                );
             } else if b <= 0b11110100u8 {
                 if len < i + 3 {
                     return self.eof_err();
@@ -270,10 +273,12 @@ impl<'a> MemCharReader<'a> {
                 let b1 = self.data.get_unchecked(i + 1);
                 let b2 = self.data.get_unchecked(i + 2);
                 let b3 = self.data.get_unchecked(i + 3);
-                self.c = char::from_u32_unchecked(((b & 0b00000111u8) as u32).wrapping_shl(18)
-                    + ((b1 & 0b00111111u8) as u32).wrapping_shl(12)
-                    + ((b2 & 0b00111111) as u32).wrapping_shl(6)
-                    + (b3 & 0b00111111) as u32);
+                self.c = char::from_u32_unchecked(
+                    ((b & 0b00000111u8) as u32).wrapping_shl(18)
+                        + ((b1 & 0b00111111u8) as u32).wrapping_shl(12)
+                        + ((b2 & 0b00111111) as u32).wrapping_shl(6)
+                        + (b3 & 0b00111111) as u32,
+                );
             } else {
                 return self.encoding_err(4);
             }
@@ -309,27 +314,50 @@ impl<'a> Reader for MemCharReader<'a> {
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
     fn input(&mut self) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(std::str::from_utf8(&self.data).expect("input must be a valid utf8")))
+        Ok(Cow::Borrowed(
+            std::str::from_utf8(&self.data).expect("input must be a valid utf8"),
+        ))
     }
 
     #[cfg(not(debug_assertions))]
     fn input(&mut self) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(unsafe { std::str::from_utf8_unchecked(&self.data) }))
+        Ok(Cow::Borrowed(unsafe {
+            std::str::from_utf8_unchecked(&self.data)
+        }))
     }
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
     fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8")))
+        Ok(Cow::Borrowed(
+            std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8"),
+        ))
     }
 
     #[cfg(not(debug_assertions))]
     fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(unsafe { std::str::from_utf8_unchecked(&self.data[start..end]) }))
+        Ok(Cow::Borrowed(unsafe {
+            std::str::from_utf8_unchecked(&self.data[start..end])
+        }))
     }
 
-    fn quote(&mut self, from: Position, to: Position, lines_before: u32, lines_after: u32, message: Cow<str>) -> Quote {
-        Quote::new(self.path, self.data, from, to, lines_before, lines_after, message)
+    fn quote(
+        &mut self,
+        from: Position,
+        to: Position,
+        lines_before: u32,
+        lines_after: u32,
+        message: Cow<str>,
+    ) -> Quote {
+        Quote::new(
+            self.path,
+            self.data,
+            from,
+            to,
+            lines_before,
+            lines_after,
+            message,
+        )
     }
 }
 
@@ -408,7 +436,11 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 
-    fn match_str_term_mut(&mut self, s: &str, f: &mut dyn FnMut(Option<char>) -> bool) -> ParseResult<bool> {
+    fn match_str_term_mut(
+        &mut self,
+        s: &str,
+        f: &mut dyn FnMut(Option<char>) -> bool,
+    ) -> ParseResult<bool> {
         let mut r = self.clone();
         if r.match_str(s)? {
             let e = self.pos.offset + s.len();
@@ -421,7 +453,6 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct MemByteReader<'a> {
@@ -455,28 +486,17 @@ impl<'a> MemByteReader<'a> {
         let mut e: ParseDiag = IoError::Utf8InvalidEncoding {
             offset: p.offset,
             len,
-        }.into();
-        let q = self.quote(
-            p,
-            p,
-            2,
-            2,
-            "illegal utf-8 encoding".into());
+        }
+        .into();
+        let q = self.quote(p, p, 2, 2, "illegal utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
     }
 
     fn eof_err<T>(&mut self) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8UnexpectedEof {
-            offset: p.offset,
-        }.into();
-        let q = self.quote(
-            p,
-            p,
-            2,
-            2,
-            "end of input at utf-8 encoding".into());
+        let mut e: ParseDiag = IoError::Utf8UnexpectedEof { offset: p.offset }.into();
+        let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
     }
@@ -507,27 +527,50 @@ impl<'a> Reader for MemByteReader<'a> {
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
     fn input(&mut self) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(std::str::from_utf8(&self.data).expect("input must be a valid utf8")))
+        Ok(Cow::Borrowed(
+            std::str::from_utf8(&self.data).expect("input must be a valid utf8"),
+        ))
     }
 
     #[cfg(not(debug_assertions))]
     fn input(&mut self) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(unsafe { std::str::from_utf8_unchecked(&self.data) }))
+        Ok(Cow::Borrowed(unsafe {
+            std::str::from_utf8_unchecked(&self.data)
+        }))
     }
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
     fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8")))
+        Ok(Cow::Borrowed(
+            std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8"),
+        ))
     }
 
     #[cfg(not(debug_assertions))]
     fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
-        Ok(Cow::Borrowed(unsafe { std::str::from_utf8_unchecked(&self.data[start..end]) }))
+        Ok(Cow::Borrowed(unsafe {
+            std::str::from_utf8_unchecked(&self.data[start..end])
+        }))
     }
 
-    fn quote(&mut self, from: Position, to: Position, lines_before: u32, lines_after: u32, message: Cow<str>) -> Quote {
-        Quote::new(self.path, self.data, from, to, lines_before, lines_after, message)
+    fn quote(
+        &mut self,
+        from: Position,
+        to: Position,
+        lines_before: u32,
+        lines_after: u32,
+        message: Cow<str>,
+    ) -> Quote {
+        Quote::new(
+            self.path,
+            self.data,
+            from,
+            to,
+            lines_before,
+            lines_after,
+            message,
+        )
     }
 }
 
@@ -574,9 +617,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
     fn peek_byte(&mut self, lookahead: usize) -> ParseResult<Option<u8>> {
         let offset = self.pos.offset + lookahead;
         if offset < self.data.len() {
-            unsafe {
-                Ok(Some(*self.data.get_unchecked(offset)))
-            }
+            unsafe { Ok(Some(*self.data.get_unchecked(offset))) }
         } else {
             Ok(None)
         }
@@ -585,9 +626,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
     fn peek_byte_pos(&mut self, lookahead: usize) -> ParseResult<Option<(u8, Position)>> {
         if lookahead == 0 {
             if self.pos.offset < self.data.len() {
-                unsafe {
-                    Ok(Some((*self.data.get_unchecked(self.pos.offset), self.pos)))
-                }
+                unsafe { Ok(Some((*self.data.get_unchecked(self.pos.offset), self.pos))) }
             } else {
                 Ok(None)
             }
@@ -598,9 +637,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
                     return Ok(None);
                 }
             }
-            unsafe {
-                Ok(Some((*r.data.get_unchecked(r.pos.offset), r.pos)))
-            }
+            unsafe { Ok(Some((*r.data.get_unchecked(r.pos.offset), r.pos))) }
         }
     }
 
@@ -619,7 +656,6 @@ impl<'a> ByteReader for MemByteReader<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,7 +663,9 @@ mod tests {
     #[test]
     fn char_reader_match_str_term() {
         let mut r = MemCharReader::new("example input".as_bytes());
-        let m = r.match_str_term("example", &|c| c.is_none() || c.unwrap().is_whitespace()).unwrap();
+        let m = r
+            .match_str_term("example", &|c| c.is_none() || c.unwrap().is_whitespace())
+            .unwrap();
         assert!(m);
         assert_eq!(r.position().offset, 0);
     }
