@@ -12,6 +12,18 @@ UTF-8 textual data with position tracking.
 contains traits `ByteReader` and `CharReader` for reading textual input with position (line and column) tracking. 
 * crate [`kg-diag-derive`](kg-diag-derive) implements macro for `#[derive(Detail)]`
 
+## Builds statuses for Rust channels
+
+| stable            | beta              | nightly           |
+|-------------------|-------------------|-------------------|
+| [![Build1][3]][4] | [![Build2][2]][4] | [![Build3][1]][4] |
+
+[1]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-diag/branches/master/1
+[2]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-diag/branches/master/2
+[3]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-diag/branches/master/3
+[4]: https://travis-ci.org/kodegenix/kg-diag
+
+
 ## License
 
 Licensed under either of
