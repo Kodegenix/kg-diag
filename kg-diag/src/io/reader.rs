@@ -641,18 +641,11 @@ impl<'a> ByteReader for MemByteReader<'a> {
         }
     }
 
-    fn skip_bytes(&mut self, _skip: usize) -> ParseResult<()> {
-        unimplemented!();
-
-        //FIXME (jc) need to scan for utf8 multibyte chars and update line and column
-        //        let mut offset = self.pos.offset + _skip;
-        //        if offset > self.data.len() {
-        //            offset = self.data.len()
-        //        }
-        //        self.left = 0;
-        //        self.pos.offset = offset;
-        //
-        //        Ok(())
+    fn skip_bytes(&mut self, skip: usize) -> ParseResult<()> {
+        for _ in 0..skip {
+            self.next_byte()?;
+        }
+        Ok(())
     }
 }
 
