@@ -82,11 +82,11 @@ impl FileBuffer {
         })
     }
 
-    pub fn char_reader(&mut self) -> MemCharReader {
+    pub fn char_reader(&self) -> MemCharReader {
         MemCharReader::with_path(&self.path, &self.data)
     }
 
-    pub fn byte_reader(&mut self) -> MemByteReader {
+    pub fn byte_reader(&self) -> MemByteReader {
         MemByteReader::with_path(&self.path, &self.data)
     }
 
