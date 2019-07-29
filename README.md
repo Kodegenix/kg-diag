@@ -3,7 +3,7 @@
 [![Latest Version](https://img.shields.io/crates/v/kg-diag.svg)](https://crates.io/crates/kg-diag)
 [![Documentation](https://docs.rs/kg-diag/badge.svg)](https://docs.rs/kg-diag)
 [![Build Status](https://travis-ci.org/Kodegenix/kg-diag.svg?branch=master)](https://travis-ci.org/Kodegenix/kg-diag)
-[![Coverage Status](https://coveralls.io/repos/github/Kodegenix/kg-diag/badge.svg?branch=master)](https://coveralls.io/github/Kodegenix/kg-diag?branch=master)
+[![codecov](https://codecov.io/gh/kodegenix/kg-diag/branch/master/graph/badge.svg)](https://codecov.io/gh/kodegenix/kg-diag)
 
 Set of crates for error/diagnostic management. I/O routines for reading 
 UTF-8 textual data with position tracking.
