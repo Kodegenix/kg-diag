@@ -14,8 +14,8 @@ edition = "2018"
 [dependencies]
 kg-display-derive = "0.1.1"
 backtrace = "0.3.33"
-serde = "1.0.97"
-serde_derive = "1.0.97"
+serde = "1.0.98"
+serde_derive = "1.0.98"
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
