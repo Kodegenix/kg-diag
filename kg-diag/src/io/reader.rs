@@ -168,6 +168,16 @@ pub trait CharReader: Reader {
     }
 }
 
+fn consume_bom(input: &[u8]) -> &[u8]{
+    let mut input= input;
+    if input.len() >= 6{
+        if &input[..6] == "\u{EF}\u{BB}\u{BF}".as_bytes() {
+            input = &input[6..input.len()];
+        }
+    };
+    input
+}
+
 #[derive(Debug, Clone)]
 pub struct MemCharReader<'a> {
     path: Option<&'a Path>,
@@ -179,6 +189,7 @@ pub struct MemCharReader<'a> {
 
 impl<'a> MemCharReader<'a> {
     pub fn new(input: &'a [u8]) -> MemCharReader<'a> {
+        let input = consume_bom(&input);
         MemCharReader {
             path: None,
             data: input,
@@ -192,6 +203,7 @@ impl<'a> MemCharReader<'a> {
         path: &'a P,
         input: &'a [u8],
     ) -> MemCharReader<'a> {
+        let input = consume_bom(&input);
         MemCharReader {
             path: Some(path.as_ref()),
             data: input,

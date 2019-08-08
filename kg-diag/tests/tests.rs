@@ -65,3 +65,19 @@ fn macro_diags_with_kind_and_quotes() {
 
     assert!(es.contains("  2| line 2;\n   | ^^^^^^^ msg\n"));
 }
+
+#[test]
+fn consume_bom() {
+    let input = "\u{EF}\u{BB}\u{BF} and characters after BOM";
+    let ref mut r = MemCharReader::new(input.as_bytes());
+    let c = r.peek_char(0).unwrap().unwrap();
+    assert_eq!(' ', c);
+}
+
+#[test]
+fn consume_bom_without_bom() {
+    let input = "characters without BOM";
+    let ref mut r = MemCharReader::new(input.as_bytes());
+    let c = r.peek_char(0).unwrap().unwrap();
+    assert_eq!('c', c);
+}
