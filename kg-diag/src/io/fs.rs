@@ -34,6 +34,12 @@ pub enum FileType {
     Special,
 }
 
+impl FileType {
+    pub fn is_file(&self) -> bool {
+        self == &FileType::File
+    }
+}
+
 impl From<std::fs::FileType> for FileType {
     fn from(f: std::fs::FileType) -> FileType {
         if f.is_dir() {
