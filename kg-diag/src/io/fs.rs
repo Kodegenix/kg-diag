@@ -147,7 +147,7 @@ pub fn current_dir() -> IoResult<PathBuf> {
     match std::env::current_dir() {
         Ok(dir) => Ok(dir),
         Err(err) => {
-            let e = IoError::CurrentDirGet { kind: err.kind() };
+            let e = IoErrorDetail::CurrentDirGet { kind: err.kind() };
             Err(e)
         }
     }
@@ -173,7 +173,7 @@ pub fn create_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
         if !p.exists() {
             create_dir(p)?;
         } else if !p.is_dir() {
-            return Err(IoError::IoPath {
+            return Err(IoErrorDetail::IoPath {
                 kind: std::io::ErrorKind::AlreadyExists,
                 path: p.into(),
                 op_type: OpType::Create,
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn file_not_found() {
         let e = FileBuffer::open("./should_not_exist").unwrap_err();
-        let err = error::IoError::IoPath {
+        let err = error::IoErrorDetail::IoPath {
             path: std::path::PathBuf::from("./should_not_exist"),
             op_type: OpType::Read,
             file_type: FileType::File,
@@ -211,7 +211,7 @@ mod tests {
         let err = fs::canonicalize("./should_not_exist").unwrap_err();
         assert_eq!(
             err,
-            error::IoError::IoPath {
+            error::IoErrorDetail::IoPath {
                 kind: std::io::ErrorKind::NotFound,
                 op_type: OpType::Read,
                 file_type: FileType::Unknown,
@@ -234,7 +234,7 @@ mod tests {
         let err = fs::read_to_string(path, &mut s).unwrap_err();
         assert_eq!(
             err,
-            error::IoError::IoPath {
+            error::IoErrorDetail::IoPath {
                 kind: std::io::ErrorKind::InvalidData,
                 op_type: OpType::Read,
                 file_type: FileType::File,
@@ -253,7 +253,7 @@ mod tests {
         let err = fs::current_dir().unwrap_err();
         assert_eq!(
             err,
-            error::IoError::CurrentDirGet {
+            error::IoErrorDetail::CurrentDirGet {
                 kind: std::io::ErrorKind::NotFound
             }
         );

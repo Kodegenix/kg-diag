@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::*;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum IoError {
+pub enum IoErrorDetail {
     Io {
         kind: std::io::ErrorKind,
     },
@@ -30,20 +30,20 @@ pub enum IoError {
     Fmt,
 }
 
-impl IoError {
+impl IoErrorDetail {
     pub fn kind(&self) -> std::io::ErrorKind {
         match *self {
-            IoError::Io { kind } => kind,
-            IoError::IoPath { kind, .. } => kind,
-            IoError::CurrentDirGet { kind, .. } => kind,
-            IoError::CurrentDirSet { kind, .. } => kind,
-            IoError::Utf8UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
-            IoError::Utf8InvalidEncoding { .. } => std::io::ErrorKind::InvalidData,
-            IoError::Fmt => std::io::ErrorKind::Other,
+            IoErrorDetail::Io { kind } => kind,
+            IoErrorDetail::IoPath { kind, .. } => kind,
+            IoErrorDetail::CurrentDirGet { kind, .. } => kind,
+            IoErrorDetail::CurrentDirSet { kind, .. } => kind,
+            IoErrorDetail::Utf8UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
+            IoErrorDetail::Utf8InvalidEncoding { .. } => std::io::ErrorKind::InvalidData,
+            IoErrorDetail::Fmt => std::io::ErrorKind::Other,
         }
     }
-    pub fn file_not_found(path: PathBuf, op_type: OpType) -> IoError {
-        IoError::IoPath {
+    pub fn file_not_found(path: PathBuf, op_type: OpType) -> IoErrorDetail {
+        IoErrorDetail::IoPath {
             kind: std::io::ErrorKind::NotFound,
             file_type: FileType::File,
             op_type,
@@ -52,21 +52,21 @@ impl IoError {
     }
 }
 
-impl Detail for IoError {
+impl Detail for IoErrorDetail {
     fn code(&self) -> u32 {
         match *self {
-            IoError::Io { kind } => 1 + kind as u32,
-            IoError::IoPath { kind, .. } => 1 + kind as u32,
-            IoError::CurrentDirGet { kind } => 1 + kind as u32,
-            IoError::CurrentDirSet { kind, .. } => 1 + kind as u32,
-            IoError::Utf8UnexpectedEof { .. } => 20,
-            IoError::Utf8InvalidEncoding { .. } => 21,
-            IoError::Fmt => 22,
+            IoErrorDetail::Io { kind } => 1 + kind as u32,
+            IoErrorDetail::IoPath { kind, .. } => 1 + kind as u32,
+            IoErrorDetail::CurrentDirGet { kind } => 1 + kind as u32,
+            IoErrorDetail::CurrentDirSet { kind, .. } => 1 + kind as u32,
+            IoErrorDetail::Utf8UnexpectedEof { .. } => 20,
+            IoErrorDetail::Utf8InvalidEncoding { .. } => 21,
+            IoErrorDetail::Fmt => 22,
         }
     }
 }
 
-impl std::fmt::Display for IoError {
+impl std::fmt::Display for IoErrorDetail {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         fn kind_str(kind: std::io::ErrorKind) -> &'static str {
             use std::io::ErrorKind;
@@ -93,10 +93,10 @@ impl std::fmt::Display for IoError {
             }
         }
         match *self {
-            IoError::Io { kind } => {
+            IoErrorDetail::Io { kind } => {
                 write!(f, "{}", kind_str(kind))?;
             }
-            IoError::IoPath {
+            IoErrorDetail::IoPath {
                 kind,
                 op_type,
                 file_type,
@@ -111,10 +111,10 @@ impl std::fmt::Display for IoError {
                     kind_str(kind)
                 )?;
             }
-            IoError::CurrentDirGet { kind } => {
+            IoErrorDetail::CurrentDirGet { kind } => {
                 write!(f, "cannot get current dir: {}", kind_str(kind))?;
             }
-            IoError::CurrentDirSet { kind, ref path } => {
+            IoErrorDetail::CurrentDirSet { kind, ref path } => {
                 write!(
                     f,
                     "cannot set current dir to {}: {}",
@@ -122,17 +122,17 @@ impl std::fmt::Display for IoError {
                     kind_str(kind)
                 )?;
             }
-            IoError::Utf8UnexpectedEof { offset, .. } => {
+            IoErrorDetail::Utf8UnexpectedEof { offset, .. } => {
                 write!(
                     f,
                     "unexpected end of input at offset {} while decoding utf-8",
                     offset
                 )?;
             }
-            IoError::Utf8InvalidEncoding { offset, .. } => {
+            IoErrorDetail::Utf8InvalidEncoding { offset, .. } => {
                 write!(f, "invalid utf-8 encoding at offset {}", offset)?;
             }
-            IoError::Fmt => {
+            IoErrorDetail::Fmt => {
                 write!(f, "formatting error")?;
             }
         }
@@ -140,21 +140,21 @@ impl std::fmt::Display for IoError {
     }
 }
 
-impl From<std::io::Error> for IoError {
+impl From<std::io::Error> for IoErrorDetail {
     fn from(err: std::io::Error) -> Self {
-        IoError::Io { kind: err.kind() }
+        IoErrorDetail::Io { kind: err.kind() }
     }
 }
 
-impl From<std::io::ErrorKind> for IoError {
+impl From<std::io::ErrorKind> for IoErrorDetail {
     fn from(kind: std::io::ErrorKind) -> Self {
-        IoError::Io { kind }
+        IoErrorDetail::Io { kind }
     }
 }
 
-impl From<std::fmt::Error> for IoError {
+impl From<std::fmt::Error> for IoErrorDetail {
     fn from(_: std::fmt::Error) -> Self {
-        IoError::Fmt
+        IoErrorDetail::Fmt
     }
 }
 
@@ -167,7 +167,7 @@ impl<T> ResultExt<T> for std::io::Result<T> {
     fn info<P: Into<PathBuf>>(self, path: P, op_type: OpType, file_type: FileType) -> IoResult<T> {
         match self {
             Ok(value) => Ok(value),
-            Err(err) => Err(IoError::IoPath {
+            Err(err) => Err(IoErrorDetail::IoPath {
                 kind: err.kind(),
                 op_type,
                 file_type,

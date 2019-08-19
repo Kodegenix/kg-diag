@@ -1,4 +1,4 @@
-pub use self::error::{IoError, ResultExt};
+pub use self::error::{IoErrorDetail, ResultExt};
 pub use self::fs::{FileBuffer, FileType, OpType};
 pub use self::reader::{ByteReader, CharReader, MemByteReader, MemCharReader, Reader};
 
@@ -6,7 +6,7 @@ pub mod error;
 pub mod fs;
 mod reader;
 
-pub type IoResult<T> = std::result::Result<T, IoError>;
+pub type IoResult<T> = std::result::Result<T, IoErrorDetail>;
 pub type ParseResult<T> = std::result::Result<T, ParseDiag>;
 
 use super::*;

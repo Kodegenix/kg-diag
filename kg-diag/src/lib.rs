@@ -8,7 +8,7 @@ extern crate serde_derive;
 pub use self::detail::{Detail, Severity};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
 pub use self::io::{
-    ByteReader, CharReader, FileBuffer, FileType, IoError, IoResult, LexTerm, LexToken,
+    ByteReader, CharReader, FileBuffer, FileType, IoErrorDetail, IoResult, LexTerm, LexToken,
     MemByteReader, MemCharReader, OpType, ParseResult, Position, Quote, Reader, Span,
 };
 pub use self::multi::{Diags, Errors};
