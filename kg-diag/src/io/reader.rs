@@ -215,7 +215,7 @@ impl<'a> MemCharReader<'a> {
 
     fn encoding_err<T>(&mut self, len: usize) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8InvalidEncoding {
+        let mut e: ParseDiag = IoErrorDetail::Utf8InvalidEncoding {
             offset: p.offset,
             len,
         }
@@ -227,7 +227,7 @@ impl<'a> MemCharReader<'a> {
 
     fn eof_err<T>(&mut self) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8UnexpectedEof { offset: p.offset }.into();
+        let mut e: ParseDiag = IoErrorDetail::Utf8UnexpectedEof { offset: p.offset }.into();
         let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
@@ -495,7 +495,7 @@ impl<'a> MemByteReader<'a> {
 
     fn encoding_err<T>(&mut self, len: usize) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8InvalidEncoding {
+        let mut e: ParseDiag = IoErrorDetail::Utf8InvalidEncoding {
             offset: p.offset,
             len,
         }
@@ -507,7 +507,7 @@ impl<'a> MemByteReader<'a> {
 
     fn eof_err<T>(&mut self) -> ParseResult<T> {
         let p = self.pos;
-        let mut e: ParseDiag = IoError::Utf8UnexpectedEof { offset: p.offset }.into();
+        let mut e: ParseDiag = IoErrorDetail::Utf8UnexpectedEof { offset: p.offset }.into();
         let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
         e.add_quote(q);
         Err(e)
@@ -686,8 +686,8 @@ mod tests {
 
             let err = r.next_char().expect_err("Error expected");
 
-            match err.detail().downcast_ref::<IoError>() {
-                Some(&IoError::Utf8InvalidEncoding { offset, len }) => {
+            match err.detail().downcast_ref::<IoErrorDetail>() {
+                Some(&IoErrorDetail::Utf8InvalidEncoding { offset, len }) => {
                     assert_eq!(offset, 2);
                     assert_eq!(len, 4);
                 }
