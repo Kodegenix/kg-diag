@@ -4,6 +4,7 @@ pub use self::reader::{ByteReader, CharReader, MemByteReader, MemCharReader, Rea
 
 pub mod error;
 pub mod fs;
+pub mod num;
 mod reader;
 
 pub type IoResult<T> = std::result::Result<T, IoError>;
