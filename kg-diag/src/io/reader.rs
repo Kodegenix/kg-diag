@@ -168,13 +168,13 @@ pub trait CharReader: Reader {
     }
 }
 
-fn consume_bom(input: &[u8]) -> &[u8]{
+fn consume_bom(input: &[u8]) -> &[u8] {
     let mut input= input;
-    if input.len() >= 6{
+    if input.len() >= 6 {
         if &input[..6] == "\u{EF}\u{BB}\u{BF}".as_bytes() {
             input = &input[6..input.len()];
         }
-    };
+    }
     input
 }
 
