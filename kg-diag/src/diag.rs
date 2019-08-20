@@ -53,7 +53,7 @@ impl dyn Diag {
             }
         }
         if let Some(c) = self.cause() {
-            write!(f, "caused by:\n{}", c)?;
+            write!(f, "caused by: {}", c)?;
         }
         if let Some(s) = self.stacktrace() {
             write!(f, "{}", s)?;

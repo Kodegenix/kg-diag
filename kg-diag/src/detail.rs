@@ -1,6 +1,7 @@
 use std::any::TypeId;
 use std::convert::TryFrom;
 use std::fmt::{Debug, Display};
+use crate::{BasicDiag, Diag};
 
 #[derive(Debug, Display, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum Severity {
@@ -125,5 +126,16 @@ impl dyn Detail {
         } else {
             None
         }
+    }
+}
+
+pub trait DetailExt {
+    fn with_cause<D: Diag>(self, cause: D) -> BasicDiag;
+}
+
+impl <T> DetailExt for T
+    where T: Detail {
+    fn with_cause<D: Diag>(self, cause: D) -> BasicDiag {
+       BasicDiag::with_cause(self, cause)
     }
 }

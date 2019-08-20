@@ -58,16 +58,31 @@ macro_rules! parse_diag {
         e
     }};
 }
-
-pub trait ResultExt<T> {
-    fn into_diag(self) -> Result<T, BasicDiag>;
+pub trait IntoDiagRes<T> {
+    fn into_diag_res(self) -> Result<T, BasicDiag>;
 }
 
-impl<T, E: Detail> ResultExt<T> for Result<T, E> {
-    fn into_diag(self) -> Result<T, BasicDiag> {
+impl<T, E: Detail> IntoDiagRes<T> for Result<T, E> {
+    fn into_diag_res(self) -> Result<T, BasicDiag> {
         self.map_err(|detail| BasicDiag::from(detail))
     }
 }
+
+pub trait DiagResultExt<T> {
+    fn map_err_as_cause<D: Detail,O: FnOnce() -> D>(self, op: O) -> Result<T, BasicDiag>;
+}
+
+impl<T, E: Diag> DiagResultExt<T> for Result<T, E> {
+    fn map_err_as_cause<D: Detail, O: FnOnce() -> D>(self, op: O) -> Result<T, BasicDiag> {
+        match self {
+            Ok(t) => Ok(t),
+            Err(e) => {
+                Err(BasicDiag::with_cause(op(), e))
+            }
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
