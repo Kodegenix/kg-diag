@@ -5,7 +5,7 @@ extern crate kg_display_derive;
 #[macro_use]
 extern crate serde_derive;
 
-pub use self::detail::{Detail, Severity};
+pub use self::detail::{Detail, Severity, DetailExt};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
 pub use self::io::{
     ByteReader, CharReader, FileBuffer, FileType, IoErrorDetail, IoResult, LexTerm, LexToken,
