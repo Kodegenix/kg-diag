@@ -13,18 +13,18 @@ pub trait Reader {
 
     fn position(&self) -> Position;
 
-    fn seek(&mut self, pos: Position) -> ParseResult<()>;
+    fn seek(&mut self, pos: Position) -> IoResult<()>;
 
-    fn input(&mut self) -> ParseResult<Cow<str>>;
+    fn input(&mut self) -> IoResult<Cow<str>>;
 
-    fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>>;
+    fn slice(&mut self, start: usize, end: usize) -> IoResult<Cow<str>>;
 
     #[inline]
-    fn slice_pos(&mut self, from: Position, to: Position) -> ParseResult<Cow<str>> {
+    fn slice_pos(&mut self, from: Position, to: Position) -> IoResult<Cow<str>> {
         self.slice(from.offset, to.offset)
     }
 
-    fn reset(&mut self) -> ParseResult<()> {
+    fn reset(&mut self) -> IoResult<()> {
         self.seek(Default::default())
     }
 
@@ -39,35 +39,29 @@ pub trait Reader {
 }
 
 pub trait ByteReader: Reader {
-    fn next_byte(&mut self) -> ParseResult<Option<u8>>;
+    fn next_byte(&mut self) -> IoResult<Option<u8>>;
 
-    fn peek_byte(&mut self, lookahead: usize) -> ParseResult<Option<u8>>;
+    fn peek_byte(&mut self, lookahead: usize) -> IoResult<Option<u8>>;
 
-    fn peek_byte_pos(&mut self, lookahead: usize) -> ParseResult<Option<(u8, Position)>>;
+    fn peek_byte_pos(&mut self, lookahead: usize) -> IoResult<Option<(u8, Position)>>;
 
-    fn skip_bytes(&mut self, skip: usize) -> ParseResult<()>;
+    fn skip_bytes(&mut self, skip: usize) -> IoResult<()>;
 }
 
 pub trait CharReader: Reader {
-    fn next_char(&mut self) -> ParseResult<Option<char>>;
+    fn next_char(&mut self) -> IoResult<Option<char>>;
 
-    fn peek_char(&mut self, lookahead: usize) -> ParseResult<Option<char>>;
+    fn peek_char(&mut self, lookahead: usize) -> IoResult<Option<char>>;
 
-    fn peek_char_pos(&mut self, lookahead: usize) -> ParseResult<Option<(char, Position)>>;
+    fn peek_char_pos(&mut self, lookahead: usize) -> IoResult<Option<(char, Position)>>;
 
-    fn skip_chars(&mut self, skip: usize) -> ParseResult<()>;
+    fn skip_chars(&mut self, skip: usize) -> IoResult<()>;
 
-    fn match_str(&mut self, s: &str) -> ParseResult<bool>;
+    fn match_str(&mut self, s: &str) -> IoResult<bool>;
 
-    fn match_str_term(&mut self, s: &str, f: &dyn Fn(Option<char>) -> bool) -> ParseResult<bool>;
+    fn match_str_term(&mut self, s: &str, f: &mut dyn FnMut(Option<char>) -> bool) -> IoResult<bool>;
 
-    fn match_str_term_mut(
-        &mut self,
-        s: &str,
-        f: &mut dyn FnMut(Option<char>) -> bool,
-    ) -> ParseResult<bool>;
-
-    fn match_char(&mut self, c: char) -> ParseResult<bool> {
+    fn match_char(&mut self, c: char) -> IoResult<bool> {
         if let Some(k) = self.peek_char(0)? {
             Ok(c == k)
         } else {
@@ -75,7 +69,8 @@ pub trait CharReader: Reader {
         }
     }
 
-    fn skip_whitespace(&mut self) -> ParseResult<()> {
+    #[inline]
+    fn skip_whitespace(&mut self) -> IoResult<()> {
         while let Some(c) = self.peek_char(0)? {
             if c.is_whitespace() {
                 self.next_char()?;
@@ -86,7 +81,8 @@ pub trait CharReader: Reader {
         Ok(())
     }
 
-    fn skip_whitespace_nonl(&mut self) -> ParseResult<()> {
+    #[inline]
+    fn skip_whitespace_nonl(&mut self) -> IoResult<()> {
         while let Some(c) = self.peek_char(0)? {
             if c.is_whitespace() && c != '\n' {
                 self.next_char()?;
@@ -97,7 +93,8 @@ pub trait CharReader: Reader {
         Ok(())
     }
 
-    fn scan(&mut self, f: &dyn Fn(char) -> bool) -> ParseResult<Cow<str>> {
+    #[inline]
+    fn scan(&mut self, f: &mut dyn FnMut(char) -> bool) -> IoResult<Cow<str>> {
         let s = self.position().offset;
         while let Some(c) = self.peek_char(0)? {
             if f(c) {
@@ -110,20 +107,8 @@ pub trait CharReader: Reader {
         self.slice(s, offset)
     }
 
-    fn scan_mut(&mut self, f: &mut dyn FnMut(char) -> bool) -> ParseResult<Cow<str>> {
-        let s = self.position().offset;
-        while let Some(c) = self.peek_char(0)? {
-            if f(c) {
-                self.next_char()?;
-            } else {
-                break;
-            }
-        }
-        let offset = self.position().offset;
-        self.slice(s, offset)
-    }
-
-    fn skip_until(&mut self, f: &dyn Fn(char) -> bool) -> ParseResult<()> {
+    #[inline]
+    fn skip_until(&mut self, f: &mut dyn FnMut(char) -> bool) -> IoResult<()> {
         while let Some(c) = self.peek_char(0)? {
             if f(c) {
                 break;
@@ -134,29 +119,8 @@ pub trait CharReader: Reader {
         Ok(())
     }
 
-    fn skip_until_mut(&mut self, f: &mut dyn FnMut(char) -> bool) -> ParseResult<()> {
-        while let Some(c) = self.peek_char(0)? {
-            if f(c) {
-                break;
-            } else {
-                self.next_char()?;
-            }
-        }
-        Ok(())
-    }
-
-    fn skip_while(&mut self, f: &dyn Fn(char) -> bool) -> ParseResult<()> {
-        while let Some(c) = self.peek_char(0)? {
-            if f(c) {
-                self.next_char()?;
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    fn skip_while_mut(&mut self, f: &mut dyn FnMut(char) -> bool) -> ParseResult<()> {
+    #[inline]
+    fn skip_while(&mut self, f: &mut dyn FnMut(char) -> bool) -> IoResult<()> {
         while let Some(c) = self.peek_char(0)? {
             if f(c) {
                 self.next_char()?;
@@ -213,27 +177,21 @@ impl<'a> MemCharReader<'a> {
         }
     }
 
-    fn encoding_err<T>(&mut self, len: usize) -> ParseResult<T> {
-        let p = self.pos;
-        let mut e: ParseDiag = IoErrorDetail::Utf8InvalidEncoding {
-            offset: p.offset,
+    fn encoding_err<T>(&mut self, len: usize) -> IoResult<T> {
+        Err(IoErrorDetail::Utf8InvalidEncoding {
+            pos: self.pos,
             len,
-        }
-        .into();
-        let q = self.quote(p, p, 2, 2, "illegal utf-8 encoding".into());
-        e.add_quote(q);
-        Err(e)
+        })
     }
 
-    fn eof_err<T>(&mut self) -> ParseResult<T> {
-        let p = self.pos;
-        let mut e: ParseDiag = IoErrorDetail::Utf8UnexpectedEof { offset: p.offset }.into();
-        let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
-        e.add_quote(q);
-        Err(e)
+    fn eof_err<T>(&mut self) -> IoResult<T> {
+        Err(IoErrorDetail::UnexpectedEof {
+            pos: self.pos,
+            task: "decoding utf-8".into()
+        })
     }
 
-    fn next(&mut self) -> ParseResult<()> {
+    fn next(&mut self) -> IoResult<()> {
         if self.len > 0 {
             self.pos.offset += self.len;
             if self.c == '\n' {
@@ -316,7 +274,7 @@ impl<'a> Reader for MemCharReader<'a> {
         self.pos
     }
 
-    fn seek(&mut self, pos: Position) -> ParseResult<()> {
+    fn seek(&mut self, pos: Position) -> IoResult<()> {
         self.pos = pos;
         self.c = '\0';
         self.len = 0;
@@ -325,14 +283,14 @@ impl<'a> Reader for MemCharReader<'a> {
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
-    fn input(&mut self) -> ParseResult<Cow<str>> {
+    fn input(&mut self) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(
             std::str::from_utf8(&self.data).expect("input must be a valid utf8"),
         ))
     }
 
     #[cfg(not(debug_assertions))]
-    fn input(&mut self) -> ParseResult<Cow<str>> {
+    fn input(&mut self) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(unsafe {
             std::str::from_utf8_unchecked(&self.data)
         }))
@@ -340,14 +298,14 @@ impl<'a> Reader for MemCharReader<'a> {
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
-    fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
+    fn slice(&mut self, start: usize, end: usize) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(
             std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8"),
         ))
     }
 
     #[cfg(not(debug_assertions))]
-    fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
+    fn slice(&mut self, start: usize, end: usize) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(unsafe {
             std::str::from_utf8_unchecked(&self.data[start..end])
         }))
@@ -374,7 +332,7 @@ impl<'a> Reader for MemCharReader<'a> {
 }
 
 impl<'a> CharReader for MemCharReader<'a> {
-    fn next_char(&mut self) -> ParseResult<Option<char>> {
+    fn next_char(&mut self) -> IoResult<Option<char>> {
         self.next()?;
         if self.len > 0 {
             Ok(Some(self.c))
@@ -383,7 +341,7 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 
-    fn peek_char(&mut self, lookahead: usize) -> ParseResult<Option<char>> {
+    fn peek_char(&mut self, lookahead: usize) -> IoResult<Option<char>> {
         if lookahead == 0 {
             if self.len == 0 {
                 self.next_char()
@@ -401,7 +359,7 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 
-    fn peek_char_pos(&mut self, lookahead: usize) -> ParseResult<Option<(char, Position)>> {
+    fn peek_char_pos(&mut self, lookahead: usize) -> IoResult<Option<(char, Position)>> {
         if lookahead == 0 {
             if self.len == 0 {
                 self.next_char().map(|c| c.map(|c| (c, self.position())))
@@ -419,14 +377,14 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 
-    fn skip_chars(&mut self, skip: usize) -> ParseResult<()> {
+    fn skip_chars(&mut self, skip: usize) -> IoResult<()> {
         for _ in 0..skip {
             self.next_char()?;
         }
         Ok(())
     }
 
-    fn match_str(&mut self, s: &str) -> ParseResult<bool> {
+    fn match_str(&mut self, s: &str) -> IoResult<bool> {
         if s.len() > self.data.len() - self.pos.offset {
             Ok(false)
         } else {
@@ -435,24 +393,8 @@ impl<'a> CharReader for MemCharReader<'a> {
         }
     }
 
-    fn match_str_term(&mut self, s: &str, f: &dyn Fn(Option<char>) -> bool) -> ParseResult<bool> {
-        let mut r = self.clone();
-        if r.match_str(s)? {
-            let e = self.pos.offset + s.len();
-            while r.pos.offset < e {
-                r.next_char()?;
-            }
-            Ok(f(r.peek_char(0)?))
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn match_str_term_mut(
-        &mut self,
-        s: &str,
-        f: &mut dyn FnMut(Option<char>) -> bool,
-    ) -> ParseResult<bool> {
+    #[inline]
+    fn match_str_term(&mut self, s: &str, f: &mut dyn FnMut(Option<char>) -> bool) -> IoResult<bool> {
         let mut r = self.clone();
         if r.match_str(s)? {
             let e = self.pos.offset + s.len();
@@ -493,24 +435,18 @@ impl<'a> MemByteReader<'a> {
         }
     }
 
-    fn encoding_err<T>(&mut self, len: usize) -> ParseResult<T> {
-        let p = self.pos;
-        let mut e: ParseDiag = IoErrorDetail::Utf8InvalidEncoding {
-            offset: p.offset,
+    fn encoding_err<T>(&mut self, len: usize) -> IoResult<T> {
+        Err(IoErrorDetail::Utf8InvalidEncoding {
+            pos: self.pos,
             len,
-        }
-        .into();
-        let q = self.quote(p, p, 2, 2, "illegal utf-8 encoding".into());
-        e.add_quote(q);
-        Err(e)
+        })
     }
 
-    fn eof_err<T>(&mut self) -> ParseResult<T> {
-        let p = self.pos;
-        let mut e: ParseDiag = IoErrorDetail::Utf8UnexpectedEof { offset: p.offset }.into();
-        let q = self.quote(p, p, 2, 2, "end of input at utf-8 encoding".into());
-        e.add_quote(q);
-        Err(e)
+    fn eof_err<T>(&mut self) -> IoResult<T> {
+        Err(IoErrorDetail::UnexpectedEof {
+            pos: self.pos,
+            task: "decoding utf-8".into()
+        })
     }
 }
 
@@ -531,21 +467,21 @@ impl<'a> Reader for MemByteReader<'a> {
         self.pos
     }
 
-    fn seek(&mut self, pos: Position) -> ParseResult<()> {
+    fn seek(&mut self, pos: Position) -> IoResult<()> {
         self.pos = pos;
         Ok(())
     }
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
-    fn input(&mut self) -> ParseResult<Cow<str>> {
+    fn input(&mut self) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(
             std::str::from_utf8(&self.data).expect("input must be a valid utf8"),
         ))
     }
 
     #[cfg(not(debug_assertions))]
-    fn input(&mut self) -> ParseResult<Cow<str>> {
+    fn input(&mut self) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(unsafe {
             std::str::from_utf8_unchecked(&self.data)
         }))
@@ -553,14 +489,14 @@ impl<'a> Reader for MemByteReader<'a> {
 
     /// will panic in debug if slice is not a valid utf8
     #[cfg(debug_assertions)]
-    fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
+    fn slice(&mut self, start: usize, end: usize) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(
             std::str::from_utf8(&self.data[start..end]).expect("slice must be a valid utf8"),
         ))
     }
 
     #[cfg(not(debug_assertions))]
-    fn slice(&mut self, start: usize, end: usize) -> ParseResult<Cow<str>> {
+    fn slice(&mut self, start: usize, end: usize) -> IoResult<Cow<str>> {
         Ok(Cow::Borrowed(unsafe {
             std::str::from_utf8_unchecked(&self.data[start..end])
         }))
@@ -587,7 +523,7 @@ impl<'a> Reader for MemByteReader<'a> {
 }
 
 impl<'a> ByteReader for MemByteReader<'a> {
-    fn next_byte(&mut self) -> ParseResult<Option<u8>> {
+    fn next_byte(&mut self) -> IoResult<Option<u8>> {
         if self.pos.offset < self.data.len() {
             unsafe {
                 let off = self.pos.offset;
@@ -626,7 +562,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
         }
     }
 
-    fn peek_byte(&mut self, lookahead: usize) -> ParseResult<Option<u8>> {
+    fn peek_byte(&mut self, lookahead: usize) -> IoResult<Option<u8>> {
         let offset = self.pos.offset + lookahead;
         if offset < self.data.len() {
             unsafe { Ok(Some(*self.data.get_unchecked(offset))) }
@@ -635,7 +571,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
         }
     }
 
-    fn peek_byte_pos(&mut self, lookahead: usize) -> ParseResult<Option<(u8, Position)>> {
+    fn peek_byte_pos(&mut self, lookahead: usize) -> IoResult<Option<(u8, Position)>> {
         if lookahead == 0 {
             if self.pos.offset < self.data.len() {
                 unsafe { Ok(Some((*self.data.get_unchecked(self.pos.offset), self.pos))) }
@@ -653,7 +589,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
         }
     }
 
-    fn skip_bytes(&mut self, skip: usize) -> ParseResult<()> {
+    fn skip_bytes(&mut self, skip: usize) -> IoResult<()> {
         for _ in 0..skip {
             self.next_byte()?;
         }
@@ -669,7 +605,7 @@ mod tests {
     fn char_reader_match_str_term() {
         let mut r = MemCharReader::new("example input".as_bytes());
         let m = r
-            .match_str_term("example", &|c| c.is_none() || c.unwrap().is_whitespace())
+            .match_str_term("example", &mut |c| c.is_none() || c.unwrap().is_whitespace())
             .unwrap();
         assert!(m);
         assert_eq!(r.position().offset, 0);
@@ -686,42 +622,13 @@ mod tests {
 
             let err = r.next_char().expect_err("Error expected");
 
-            match err.detail().downcast_ref::<IoErrorDetail>() {
-                Some(&IoErrorDetail::Utf8InvalidEncoding { offset, len }) => {
-                    assert_eq!(offset, 2);
+            match err {
+                IoErrorDetail::Utf8InvalidEncoding { pos, len } => {
+                    assert_eq!(pos.offset, 2);
                     assert_eq!(len, 4);
                 }
                 _ => panic!("wrong detail in error"),
             }
-        }
-
-        #[test]
-        fn utf8_encoding_err_quote() {
-            let bytes: &[u8] = &[0x41, 0x20, 0x42, 0xff];
-
-            let mut r = MemCharReader::new(bytes);
-
-            r.skip_chars(3).unwrap();
-
-            let err = r.next_char().expect_err("Error expected");
-            println!("{}", err);
-
-            let q: &Quote = &err.quotes()[0];
-
-            let from = q.from();
-            assert_eq!(from, q.to());
-
-            assert_eq!(from.offset, 3);
-            assert_eq!(from.line, 0);
-            assert_eq!(from.column, 3);
-
-            assert_eq!(q.offset(), 0);
-            assert_eq!(q.line(), 0);
-
-            let source: Vec<_> = q.source().lines().collect();
-
-            assert_eq!(source.len(), 1);
-            assert_eq!(source[0], "A B�");
         }
     }
 

@@ -20,12 +20,19 @@ pub enum IoErrorDetail {
         kind: std::io::ErrorKind,
         path: PathBuf,
     },
-    Utf8UnexpectedEof {
-        offset: usize,
-    },
     Utf8InvalidEncoding {
-        offset: usize,
+        pos: Position,
         len: usize,
+    },
+    UnexpectedEof {
+        pos: Position,
+        task: String,
+    },
+    UnexpectedInput {
+        pos: Position,
+        found: String,
+        expected: Vec<String>,
+        task: String,
     },
     Fmt,
 }
@@ -37,8 +44,9 @@ impl IoErrorDetail {
             IoErrorDetail::IoPath { kind, .. } => kind,
             IoErrorDetail::CurrentDirGet { kind, .. } => kind,
             IoErrorDetail::CurrentDirSet { kind, .. } => kind,
-            IoErrorDetail::Utf8UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
             IoErrorDetail::Utf8InvalidEncoding { .. } => std::io::ErrorKind::InvalidData,
+            IoErrorDetail::UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
+            IoErrorDetail::UnexpectedInput { .. } => std::io::ErrorKind::InvalidData,
             IoErrorDetail::Fmt => std::io::ErrorKind::Other,
         }
     }
@@ -59,9 +67,10 @@ impl Detail for IoErrorDetail {
             IoErrorDetail::IoPath { kind, .. } => 1 + kind as u32,
             IoErrorDetail::CurrentDirGet { kind } => 1 + kind as u32,
             IoErrorDetail::CurrentDirSet { kind, .. } => 1 + kind as u32,
-            IoErrorDetail::Utf8UnexpectedEof { .. } => 20,
             IoErrorDetail::Utf8InvalidEncoding { .. } => 21,
-            IoErrorDetail::Fmt => 22,
+            IoErrorDetail::UnexpectedEof { .. } => 22,
+            IoErrorDetail::UnexpectedInput { .. } => 23,
+            IoErrorDetail::Fmt => 99,
         }
     }
 }
@@ -122,15 +131,29 @@ impl std::fmt::Display for IoErrorDetail {
                     kind_str(kind)
                 )?;
             }
-            IoErrorDetail::Utf8UnexpectedEof { offset, .. } => {
-                write!(
-                    f,
-                    "unexpected end of input at offset {} while decoding utf-8",
-                    offset
-                )?;
+            IoErrorDetail::Utf8InvalidEncoding { pos, .. } => {
+                write!(f, "invalid utf-8 encoding at {} (offset {})", pos, pos.offset)?;
             }
-            IoErrorDetail::Utf8InvalidEncoding { offset, .. } => {
-                write!(f, "invalid utf-8 encoding at offset {}", offset)?;
+            IoErrorDetail::UnexpectedEof { pos, ref task } => {
+                write!(f, "unexpected end of input at {} while {}", pos, task)?;
+            }
+            IoErrorDetail::UnexpectedInput { pos, ref found, ref expected, ref task } => {
+                write!(f, "unexpected '{}' at {} while {}", found, pos, task)?;
+                match expected.len() {
+                    0 => {}
+                    1 => write!(f, ", expecting {}", &expected[0])?,
+                    _ => {
+                        write!(f, ", expecting one of: ")?;
+                        let mut it = expected.iter().peekable();
+                        while let Some(e) = it.next() {
+                            if it.peek().is_some() {
+                                write!(f, "{}, ", e)?;
+                            } else {
+                                write!(f, "{}", e)?;
+                            }
+                        }
+                    }
+                }
             }
             IoErrorDetail::Fmt => {
                 write!(f, "formatting error")?;
