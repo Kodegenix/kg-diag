@@ -4,10 +4,11 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Notation {
     Decimal,
+    Float,
+    Exponent,
     Octal,
     Hex,
     Binary,
-    Float,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
@@ -48,7 +49,6 @@ pub struct NumberParser {
     hex: HexConfig,
     octal: OctalConfig,
     binary: BinaryConfig,
-    float: FloatConfig,
 }
 
 impl NumberParser {
@@ -58,12 +58,14 @@ impl NumberParser {
             hex: HexConfig::new(),
             octal: OctalConfig::new(),
             binary: BinaryConfig::new(),
-            float: FloatConfig::new(),
         }
     }
 
     pub fn is_at_start(&self, r: &mut dyn CharReader) -> IoResult<bool> {
-        Ok(self.decimal.is_at_start(r)?)
+        Ok(self.decimal.is_at_start(r)?
+            || self.hex.is_at_start(r)?
+            || self.octal.is_at_start(r)?
+            || self.binary.is_at_start(r)?)
     }
 
     pub fn parse_number(&mut self, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
@@ -88,7 +90,7 @@ impl NumberParser {
         } else if self.binary.is_at_start(r)? {
             self.parse_binary(sign, r)
         } else {
-            self.parse_decimal_or_float(sign, r)
+            self.parse_decimal(sign, r)
         }
     }
 
@@ -212,7 +214,7 @@ impl NumberParser {
         Ok(LexToken::new(Number::new(Notation::Binary, sign), p1, p2))
     }
 
-    fn parse_decimal_or_float(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
+    fn parse_decimal(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
         let p1 = r.position();
         if (sign == Sign::Minus && !self.decimal.allow_minus) || (sign == Sign::Plus && !self.decimal.allow_plus) {
             return Err(IoErrorDetail::UnexpectedInput {
@@ -226,6 +228,7 @@ impl NumberParser {
         }
 
         let mut digit = false;
+        let mut dot = false;
         while let Some(c) = r.peek_char(0)? {
             if c == '_' {
                 if !digit {
@@ -235,19 +238,14 @@ impl NumberParser {
                         expected: vec![String::from("decimal digit")],
                         task: "parsing a number literal".into(),
                     });
+                } else if !self.decimal.allow_underscores {
+                    break;
                 }
                 digit = false;
             } else if self.decimal.is_digit(c) {
                 digit = true;
-            } else if c == '.' && self.float.enabled {
-                let p = r.position();
-                r.seek(p1)?;
-                if let Ok(t) = self.parse_float(sign, r) {
-                    return Ok(t);
-                } else {
-                    r.seek(p)?;
-                    break;
-                }
+            } else if c == '.' {
+
             } else {
                 break;
             }
@@ -257,7 +255,7 @@ impl NumberParser {
         let p2 = r.position();
         Ok(LexToken::new(Number::new(Notation::Decimal, sign), p1, p2))
     }
-
+/*
     fn parse_float(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
         let p1 = r.position();
         if (sign == Sign::Minus && !self.float.allow_minus) || (sign == Sign::Plus && !self.float.allow_plus) {
@@ -272,29 +270,31 @@ impl NumberParser {
         }
 
         let mut dot = false;
-            let mut digit = false;
-            while let Some(c) = r.peek_char(0)? {
-                if c == '_' {
-                    if !self.float.allow_underscores || !digit {
-                        return Err(IoErrorDetail::UnexpectedInput {
-                            pos: r.position(),
-                            found: c.to_string(),
-                            expected: vec![String::from("decimal digit")],
-                            task: "parsing a number literal".into(),
-                        });
-                    }
-                    digit = false;
-                } else if self.float.is_digit(c) {
-                    digit = true;
-                } else if !dot && c == '.' {
-                    dot = true;
-                } else if (c == 'e' && self.float.case != Case::Upper) || (c == 'E' && self.float.case != Case::Lower) {
-                    self.parse_exponent(r)?;
-                    break;
-                } else {
+        let mut digit = false;
+        while let Some(c) = r.peek_char(0)? {
+            if c == '_' {
+                if !digit {
+                    return Err(IoErrorDetail::UnexpectedInput {
+                        pos: r.position(),
+                        found: c.to_string(),
+                        expected: vec![String::from("decimal digit")],
+                        task: "parsing a number literal".into(),
+                    });
+                } else if !self.float.allow_underscores {
                     break;
                 }
+                digit = false;
+            } else if self.float.is_digit(c) {
+                digit = true;
+            } else if !dot && c == '.' {
+                dot = true;
+            } else if (c == 'e' && self.float.case != Case::Upper) || (c == 'E' && self.float.case != Case::Lower) {
+                self.parse_exponent(r)?;
+                break;
+            } else {
+                break;
             }
+        }
 
         let p2 = r.position();
         Ok(LexToken::new(Number::new(Notation::Float, sign), p1, p2))
@@ -338,7 +338,7 @@ impl NumberParser {
                 task: "parsing a number literal".into(),
             })
         }
-    }
+    }*/
 }
 
 
@@ -355,6 +355,9 @@ pub struct DecimalConfig {
     allow_minus: bool,
     allow_plus: bool,
     allow_underscores: bool,
+    allow_float: bool,
+    allow_exponent: bool,
+    case: Case,
 }
 
 impl DecimalConfig {
@@ -364,6 +367,9 @@ impl DecimalConfig {
             allow_minus: false,
             allow_plus: false,
             allow_underscores: false,
+            allow_float: false,
+            allow_exponent: false,
+            case: Case::Any,
         }
     }
 
@@ -402,7 +408,7 @@ impl HexConfig {
             enabled: false,
             allow_minus: false,
             allow_plus: false,
-            allow_underscores: true,
+            allow_underscores: false,
             prefix: String::from("0x"),
             case: Case::Any,
         }
@@ -447,7 +453,7 @@ impl OctalConfig {
             enabled: false,
             allow_minus: false,
             allow_plus: false,
-            allow_underscores: true,
+            allow_underscores: false,
             prefix: String::from("0o"),
         }
     }
@@ -487,7 +493,7 @@ impl BinaryConfig {
             enabled: false,
             allow_minus: false,
             allow_plus: false,
-            allow_underscores: true,
+            allow_underscores: false,
             prefix: String::from("0b"),
         }
     }
@@ -513,46 +519,6 @@ impl BinaryConfig {
 }
 
 
-pub struct FloatConfig {
-    enabled: bool,
-    allow_minus: bool,
-    allow_plus: bool,
-    allow_underscores: bool,
-    case: Case,
-}
-
-impl FloatConfig {
-    fn new() -> FloatConfig {
-        FloatConfig {
-            enabled: false,
-            allow_minus: false,
-            allow_plus: false,
-            allow_underscores: true,
-            case: Case::Any,
-        }
-    }
-
-    fn is_at_start(&self, r: &mut dyn CharReader) -> IoResult<bool> {
-        Ok(if self.enabled {
-            if let Some(c) = r.peek_char(0)? {
-                self.is_digit(c)
-                    || (c == '-' && self.allow_minus)
-                    || (c == '+' && self.allow_plus)
-            } else {
-                false
-            }
-        } else {
-            false
-        })
-    }
-
-    fn is_digit(&self, c: char) -> bool {
-        c >= '0' && c <= '9'
-    }
-}
-
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -561,8 +527,16 @@ mod tests {
     fn can_parse_decimal() {
         let mut np = NumberParser::new();
 
-        let value = -0b001;
-        println!("{}", value);
+        np.decimal.enabled = false;
+        np.decimal.allow_underscores = true;
+        np.decimal.allow_float = true;
+        np.decimal.allow_exponent = true;
+      
+        let mut r = MemCharReader::new(b"1234_5678.12");
+
+        let n = np.parse_number(&mut r).unwrap();
+
+        println!("{:?}", r.slice_pos(n.from(), n.to()).unwrap());
 
     }
 }
