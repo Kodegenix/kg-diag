@@ -6,6 +6,7 @@ use super::*;
 pub enum IoErrorDetail {
     Io {
         kind: std::io::ErrorKind,
+        message: String,
     },
     IoPath {
         kind: std::io::ErrorKind,
@@ -40,7 +41,7 @@ pub enum IoErrorDetail {
 impl IoErrorDetail {
     pub fn kind(&self) -> std::io::ErrorKind {
         match *self {
-            IoErrorDetail::Io { kind } => kind,
+            IoErrorDetail::Io { kind, .. } => kind,
             IoErrorDetail::IoPath { kind, .. } => kind,
             IoErrorDetail::CurrentDirGet { kind, .. } => kind,
             IoErrorDetail::CurrentDirSet { kind, .. } => kind,
@@ -63,7 +64,7 @@ impl IoErrorDetail {
 impl Detail for IoErrorDetail {
     fn code(&self) -> u32 {
         match *self {
-            IoErrorDetail::Io { kind } => 1 + kind as u32,
+            IoErrorDetail::Io { kind, message: _ } => 1 + kind as u32,
             IoErrorDetail::IoPath { kind, .. } => 1 + kind as u32,
             IoErrorDetail::CurrentDirGet { kind } => 1 + kind as u32,
             IoErrorDetail::CurrentDirSet { kind, .. } => 1 + kind as u32,
@@ -102,8 +103,11 @@ impl std::fmt::Display for IoErrorDetail {
             }
         }
         match *self {
-            IoErrorDetail::Io { kind } => {
+            IoErrorDetail::Io { kind, ref message } => {
                 write!(f, "{}", kind_str(kind))?;
+                if !message.is_empty() {
+                    write!(f, ": {}", message)?;
+                }
             }
             IoErrorDetail::IoPath {
                 kind,
@@ -165,13 +169,27 @@ impl std::fmt::Display for IoErrorDetail {
 
 impl From<std::io::Error> for IoErrorDetail {
     fn from(err: std::io::Error) -> Self {
-        IoErrorDetail::Io { kind: err.kind() }
+        if let Some(e) = err.get_ref() {
+            IoErrorDetail::Io {
+                kind: err.kind(),
+                message: format!("{}", e)
+            }
+        } else {
+            IoErrorDetail::Io {
+                kind: err.kind(),
+                message: String::new()
+            }
+        }
+
     }
 }
 
 impl From<std::io::ErrorKind> for IoErrorDetail {
     fn from(kind: std::io::ErrorKind) -> Self {
-        IoErrorDetail::Io { kind }
+        IoErrorDetail::Io {
+            kind,
+            message: String::new()
+        }
     }
 }
 
@@ -182,7 +200,11 @@ impl From<std::fmt::Error> for IoErrorDetail {
 }
 
 pub trait ResultExt<T> {
+    /// Add additional information to underlining `std::io::Error` and map this error to `IoErrorDetail`
     fn info<P: Into<PathBuf>>(self, path: P, op_type: OpType, file_type: FileType) -> IoResult<T>;
+
+    /// Convert `std::io::Error` into `BasicDiag`
+    fn map_err_to_diag(self) -> Result<T, BasicDiag>;
 }
 
 impl<T> ResultExt<T> for std::io::Result<T> {
@@ -197,5 +219,10 @@ impl<T> ResultExt<T> for std::io::Result<T> {
                 path: path.into(),
             }),
         }
+    }
+
+    fn map_err_to_diag(self) -> Result<T, BasicDiag> {
+        self.map_err(|err| IoErrorDetail::from(err))
+            .into_diag_res()
     }
 }
