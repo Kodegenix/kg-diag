@@ -216,129 +216,68 @@ impl NumberParser {
 
     fn parse_decimal(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
         let p1 = r.position();
-        if (sign == Sign::Minus && !self.decimal.allow_minus) || (sign == Sign::Plus && !self.decimal.allow_plus) {
-            return Err(IoErrorDetail::UnexpectedInput {
-                pos: r.position(),
-                found: sign.to_string(),
-                expected: vec![String::from("decimal digit")],
-                task: "parsing a number literal".into(),
-            });
-        } else {
-            r.skip_chars(1)?;
-        }
 
-        let mut digit = false;
-        let mut dot = false;
-        while let Some(c) = r.peek_char(0)? {
-            if c == '_' {
-                if !digit {
-                    return Err(IoErrorDetail::UnexpectedInput {
-                        pos: r.position(),
-                        found: c.to_string(),
-                        expected: vec![String::from("decimal digit")],
-                        task: "parsing a number literal".into(),
-                    });
-                } else if !self.decimal.allow_underscores {
-                    break;
-                }
-                digit = false;
-            } else if self.decimal.is_digit(c) {
-                digit = true;
-            } else if c == '.' {
+        let mut notation = None;
+        let mut last = ' ';
 
-            } else {
-                break;
-            }
-            r.next_char()?;
-        }
-
-        let p2 = r.position();
-        Ok(LexToken::new(Number::new(Notation::Decimal, sign), p1, p2))
-    }
-/*
-    fn parse_float(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
-        let p1 = r.position();
-        if (sign == Sign::Minus && !self.float.allow_minus) || (sign == Sign::Plus && !self.float.allow_plus) {
-            return Err(IoErrorDetail::UnexpectedInput {
-                pos: r.position(),
-                found: sign.to_string(),
-                expected: vec![String::from("decimal digit")],
-                task: "parsing a number literal".into(),
-            });
-        } else {
-            r.skip_chars(1)?;
-        }
-
-        let mut dot = false;
-        let mut digit = false;
-        while let Some(c) = r.peek_char(0)? {
-            if c == '_' {
-                if !digit {
-                    return Err(IoErrorDetail::UnexpectedInput {
-                        pos: r.position(),
-                        found: c.to_string(),
-                        expected: vec![String::from("decimal digit")],
-                        task: "parsing a number literal".into(),
-                    });
-                } else if !self.float.allow_underscores {
-                    break;
-                }
-                digit = false;
-            } else if self.float.is_digit(c) {
-                digit = true;
-            } else if !dot && c == '.' {
-                dot = true;
-            } else if (c == 'e' && self.float.case != Case::Upper) || (c == 'E' && self.float.case != Case::Lower) {
-                self.parse_exponent(r)?;
-                break;
-            } else {
-                break;
-            }
-        }
-
-        let p2 = r.position();
-        Ok(LexToken::new(Number::new(Notation::Float, sign), p1, p2))
-    }
-
-    fn parse_exponent(&mut self, r: &mut dyn CharReader) -> IoResult<()> {
-        r.next_char()?;
-        let c = r.peek_char(0)?;
-        match c {
-            Some('-') | Some('+') => {
+        if sign == Sign::None || (sign == Sign::Minus && self.decimal.allow_minus) || (sign == Sign::Plus && self.decimal.allow_plus) {
+            if sign != Sign::None {
                 r.skip_chars(1)?;
-                let mut has_digits = false;
-                r.skip_while(&mut |c| {
-                    if self.float.is_digit(c) {
-                        has_digits = true;
-                        true
-                    } else {
-                        false
+            }
+
+            while let Some(c) = r.peek_char(0)? {
+                if self.decimal.is_digit(c) {
+                    match last {
+                        ' ' => notation = Some(Notation::Decimal),
+                        '.' => notation = Some(Notation::Float),
+                        'e' | '-' => notation = Some(Notation::Exponent),
+                        '0' => {}
+                        _ => unreachable!(),
                     }
-                })?;
-                if has_digits {
-                    Ok(())
+                    last = '0';
+                } else if c == '_' && self.decimal.allow_underscores && (last == '0' || last == 'e' || last == '-') {
+                    // skip
+                } else if c == '.' && self.decimal.allow_float && last == '0' && notation == Some(Notation::Decimal) {
+                    last = '.';
+                } else if ((c == 'e' && self.decimal.case != Case::Upper)
+                        || (c == 'E' && self.decimal.case != Case::Lower))
+                        && self.decimal.allow_exponent && last == '0' && notation != Some(Notation::Exponent) {
+                    last = 'e';
+                } else if (c == '-' || c == '+') && last == 'e' {
+                    last = '-';
                 } else {
-                    Err(IoErrorDetail::UnexpectedInput {
-                        pos: r.position(),
-                        found: c.unwrap().to_string(),
-                        expected: vec![String::from("[0-9]")],
-                        task: "parsing a number literal".into(),
-                    })
+                    break;
                 }
+                r.next_char()?;
             }
-            Some(c) if self.float.is_digit(c) => {
-                r.skip_chars(1)?;
-                r.skip_while(&mut |c| self.float.is_digit(c))?;
-                Ok(())
-            }
-            _ => Err(IoErrorDetail::UnexpectedInput {
-                pos: r.position(),
-                found: c.unwrap().to_string(),
-                expected: vec![String::from("'-'"), String::from("'+'"), String::from("[0-9]")],
+        }
+
+        let p2 = r.position();
+
+        if notation.is_some() && last == '0' {
+            Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p2))
+        } else {
+            Err(IoErrorDetail::UnexpectedInput {
+                pos: p2,
+                found: r.peek_char(0)?.map_or(String::new(), |c| c.to_string()),
+                expected: match last {
+                    ' ' | '.' => vec![String::from("[0-9]")],
+                    'e' => if self.decimal.allow_underscores {
+                        vec![String::from("[0-9]"), String::from("_"), String::from("-"), String::from("+")]
+                    } else {
+                        vec![String::from("[0-9]"), String::from("-"), String::from("+")]
+                    },
+                    '-' => if self.decimal.allow_underscores {
+                        vec![String::from("[0-9]"), String::from("_")]
+                    } else {
+                        vec![String::from("[0-9]")]
+                    },
+                    _ => unreachable!(),
+                },
                 task: "parsing a number literal".into(),
             })
         }
-    }*/
+    }
 }
 
 
@@ -532,11 +471,10 @@ mod tests {
         np.decimal.allow_float = true;
         np.decimal.allow_exponent = true;
       
-        let mut r = MemCharReader::new(b"1234_5678.12");
+        let mut r = MemCharReader::new(b"1234_5_678.12e-1 asdasda");
 
         let n = np.parse_number(&mut r).unwrap();
 
-        println!("{:?}", r.slice_pos(n.from(), n.to()).unwrap());
-
+        println!("{:?} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap());
     }
 }
