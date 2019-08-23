@@ -1,6 +1,62 @@
-use std::path::PathBuf;
-
 use super::*;
+
+use std::path::PathBuf;
+use kg_display::ListDisplay;
+
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
+pub enum Input {
+    Byte(u8),
+    Char(char),
+    Custom(String),
+}
+
+impl std::fmt::Display for Input {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Input::Byte(b) => write!(f, "byte 0x{:02X}", b),
+            Input::Char(c) => write!(f, "character {:?}", c),
+            Input::Custom(ref s) => write!(f, "{}", s),
+        }
+    }
+}
+
+
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
+pub enum Expected {
+    Byte(u8),
+    ByteRange(u8, u8),
+    Char(char),
+    CharRange(char, char),
+    Custom(String),
+    OneOf(Vec<Expected>),
+    Or(Box<Expected>, Box<Expected>),
+}
+
+impl Expected {
+    pub fn one_of(mut elems: Vec<Expected>) -> Expected {
+        if elems.len() == 1 {
+            elems.pop().unwrap()
+        } else {
+            elems.sort();
+            Expected::OneOf(elems)
+        }
+    }
+}
+
+impl std::fmt::Display for Expected {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Expected::Byte(b) => write!(f, "0x{:02X}", b),
+            Expected::ByteRange(a, b) => write!(f, "[0x{:02X}-0x{:02X}]", a, b),
+            Expected::Char(c) => write!(f, "{:?}", c),
+            Expected::CharRange(a, b) => write!(f, "[{:?}-{:?}]", a, b),
+            Expected::Custom(ref s) => write!(f, "{}", s),
+            Expected::OneOf(ref e) => write!(f, "one of: {}", ListDisplay(e)),
+            Expected::Or(ref a, ref b) => write!(f, "{} or {}", a, b),
+        }
+    }
+}
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum IoErrorDetail {
@@ -27,12 +83,13 @@ pub enum IoErrorDetail {
     },
     UnexpectedEof {
         pos: Position,
+        expected: Option<Box<Expected>>,
         task: String,
     },
     UnexpectedInput {
         pos: Position,
-        found: String,
-        expected: Vec<String>,
+        found: Input,
+        expected: Option<Box<Expected>>,
         task: String,
     },
     Fmt,
@@ -138,25 +195,16 @@ impl std::fmt::Display for IoErrorDetail {
             IoErrorDetail::Utf8InvalidEncoding { pos, .. } => {
                 write!(f, "invalid utf-8 encoding at {} (offset {})", pos, pos.offset)?;
             }
-            IoErrorDetail::UnexpectedEof { pos, ref task } => {
+            IoErrorDetail::UnexpectedEof { pos, ref expected, ref task } => {
                 write!(f, "unexpected end of input at {} while {}", pos, task)?;
+                if let Some(e) = expected {
+                    write!(f, ", expecting {}", e)?;
+                }
             }
             IoErrorDetail::UnexpectedInput { pos, ref found, ref expected, ref task } => {
-                write!(f, "unexpected '{}' at {} while {}", found, pos, task)?;
-                match expected.len() {
-                    0 => {}
-                    1 => write!(f, ", expecting {}", &expected[0])?,
-                    _ => {
-                        write!(f, ", expecting one of: ")?;
-                        let mut it = expected.iter().peekable();
-                        while let Some(e) = it.next() {
-                            if it.peek().is_some() {
-                                write!(f, "{}, ", e)?;
-                            } else {
-                                write!(f, "{}", e)?;
-                            }
-                        }
-                    }
+                write!(f, "unexpected {} at {} while {}", found, pos, task)?;
+                if let Some(e) = expected {
+                    write!(f, ", expecting {}", e)?;
                 }
             }
             IoErrorDetail::Fmt => {

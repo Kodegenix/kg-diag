@@ -12,6 +12,7 @@ workspace = ".."
 edition = "2018"
 
 [dependencies]
+kg-display = "0.1.2"
 kg-display-derive = "0.1.1"
 backtrace = "0.3.34"
 serde = "1.0.98"

@@ -187,7 +187,8 @@ impl<'a> MemCharReader<'a> {
     fn eof_err<T>(&mut self) -> IoResult<T> {
         Err(IoErrorDetail::UnexpectedEof {
             pos: self.pos,
-            task: "decoding utf-8".into()
+            expected: None,
+            task: "decoding UTF-8".into()
         })
     }
 
@@ -445,6 +446,7 @@ impl<'a> MemByteReader<'a> {
     fn eof_err<T>(&mut self) -> IoResult<T> {
         Err(IoErrorDetail::UnexpectedEof {
             pos: self.pos,
+            expected: None,
             task: "decoding utf-8".into()
         })
     }

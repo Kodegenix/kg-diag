@@ -1,13 +1,19 @@
 use super::*;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Notation {
+    #[display("d")]
     Decimal,
+    #[display("f")]
     Float,
+    #[display("e")]
     Exponent,
+    #[display("o")]
     Octal,
+    #[display("x")]
     Hex,
+    #[display("b")]
     Binary,
 }
 
@@ -21,7 +27,8 @@ pub enum Sign {
     Plus,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[display("{sign}{notation}")]
 pub struct Number {
     notation: Notation,
     sign: Sign,
@@ -36,11 +43,6 @@ impl Number {
     }
 }
 
-impl std::fmt::Display for Number {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        unimplemented!()
-    }
-}
 
 impl LexTerm for Number {}
 
@@ -79,33 +81,42 @@ impl NumberParser {
         } else {
             return Err(IoErrorDetail::UnexpectedEof {
                 pos: r.position(),
+                expected: None,
                 task: "parsing a number literal".into(),
             });
         }
 
-        if self.hex.is_at_start(r)? {
+        /*if self.hex.is_at_start(r)? {
             self.parse_hex(sign, r)
         } else if self.octal.is_at_start(r)? {
             self.parse_octal(sign, r)
         } else if self.binary.is_at_start(r)? {
             self.parse_binary(sign, r)
-        } else {
+        } else */if self.decimal.is_at_start(r)? {
             self.parse_decimal(sign, r)
+        } else {
+            Err(match r.peek_char(0)? {
+                Some(c) => IoErrorDetail::UnexpectedInput {
+                    pos: r.position(),
+                    found: Input::Char(c),
+                    expected: None,
+                    task: "parsing a number literal".into(),
+                },
+                None => IoErrorDetail::UnexpectedEof {
+                    pos: r.position(),
+                    expected: None,
+                    task: "parsing a number literal".into(),
+                }
+            })
         }
     }
 
-    fn parse_hex(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
+  /*  fn parse_hex(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
         let p1 = r.position();
-        if (sign == Sign::Minus && !self.hex.allow_minus) || (sign == Sign::Plus && !self.hex.allow_plus) {
-            return Err(IoErrorDetail::UnexpectedInput {
-                pos: r.position(),
-                found: sign.to_string(),
-                expected: vec![String::from("an hexadecimal digit")],
-                task: "parsing hexadecimal number literal".into(),
-            });
-        } else {
-            r.skip_chars(1)?;
-        }
+        if sign == Sign::None || (sign == Sign::Minus && self.decimal.allow_minus) || (sign == Sign::Plus && self.decimal.allow_plus) {
+            if sign != Sign::None {
+                r.skip_chars(1)?;
+            }
         r.skip_chars(self.hex.prefix.len())?;
         if !self.hex.allow_underscores {
             r.skip_while(&mut |c| self.hex.is_digit(c))?;
@@ -212,7 +223,7 @@ impl NumberParser {
         }
         let p2 = r.position();
         Ok(LexToken::new(Number::new(Notation::Binary, sign), p1, p2))
-    }
+    }*/
 
     fn parse_decimal(&mut self, sign: Sign, r: &mut dyn CharReader) -> IoResult<LexToken<Number>> {
         let p1 = r.position();
@@ -257,24 +268,45 @@ impl NumberParser {
         if notation.is_some() && last == '0' {
             Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p2))
         } else {
-            Err(IoErrorDetail::UnexpectedInput {
-                pos: p2,
-                found: r.peek_char(0)?.map_or(String::new(), |c| c.to_string()),
-                expected: match last {
-                    ' ' | '.' => vec![String::from("[0-9]")],
-                    'e' => if self.decimal.allow_underscores {
-                        vec![String::from("[0-9]"), String::from("_"), String::from("-"), String::from("+")]
-                    } else {
-                        vec![String::from("[0-9]"), String::from("-"), String::from("+")]
-                    },
-                    '-' => if self.decimal.allow_underscores {
-                        vec![String::from("[0-9]"), String::from("_")]
-                    } else {
-                        vec![String::from("[0-9]")]
-                    },
-                    _ => unreachable!(),
+            let expected = match last {
+                ' ' | '.' => {
+                    let mut expected = Vec::new();
+                    if self.decimal.allow_minus {
+                        expected.push(Expected::Char('-'));
+                    }
+                    if self.decimal.allow_plus {
+                        expected.push(Expected::Char('+'));
+                    }
+                    expected.push(Expected::CharRange('0', '9'));
+                    Expected::one_of(expected)
                 },
-                task: "parsing a number literal".into(),
+                'e' => if self.decimal.allow_underscores {
+                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_'), Expected::Char('-'), Expected::Char('+')])
+                } else {
+                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('-'), Expected::Char('+')])
+                },
+                '-' => if self.decimal.allow_underscores {
+                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_')])
+                } else {
+                    Expected::CharRange('0', '9')
+                },
+                _ => unreachable!(),
+            };
+
+            let task = "parsing a number literal".into();
+
+            Err(match r.peek_char(0)? {
+                Some(c) => IoErrorDetail::UnexpectedInput {
+                    pos: p2,
+                    found: Input::Char(c),
+                    expected: Some(box expected),
+                    task,
+                },
+                None => IoErrorDetail::UnexpectedEof {
+                    pos: p2,
+                    expected: Some(box expected),
+                    task,
+                }
             })
         }
     }
@@ -466,15 +498,20 @@ mod tests {
     fn can_parse_decimal() {
         let mut np = NumberParser::new();
 
-        np.decimal.enabled = false;
+        np.decimal.enabled = true;
+        np.decimal.allow_minus = true;
+        np.decimal.allow_plus = true;
         np.decimal.allow_underscores = true;
         np.decimal.allow_float = true;
         np.decimal.allow_exponent = true;
-      
-        let mut r = MemCharReader::new(b"1234_5_678.12e-1 asdasda");
 
-        let n = np.parse_number(&mut r).unwrap();
+        np.octal.enabled = true;
 
-        println!("{:?} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap());
+        let mut r = MemCharReader::new(b"0e-9");
+
+        match np.parse_number(&mut r) {
+            Ok(n) => println!("{} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap()),
+            Err(err) => println!("{}", err),
+        }
     }
 }

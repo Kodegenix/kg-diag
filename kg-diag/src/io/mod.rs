@@ -1,4 +1,4 @@
-pub use self::error::{IoErrorDetail, ResultExt};
+pub use self::error::{IoErrorDetail, Input, Expected, ResultExt};
 pub use self::fs::{FileBuffer, FileType, OpType};
 pub use self::reader::{ByteReader, CharReader, MemByteReader, MemCharReader, Reader};
 
