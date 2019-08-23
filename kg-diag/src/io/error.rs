@@ -1,61 +1,6 @@
 use super::*;
 
 use std::path::PathBuf;
-use kg_display::ListDisplay;
-
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
-pub enum Input {
-    Byte(u8),
-    Char(char),
-    Custom(String),
-}
-
-impl std::fmt::Display for Input {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Input::Byte(b) => write!(f, "byte 0x{:02X}", b),
-            Input::Char(c) => write!(f, "character {:?}", c),
-            Input::Custom(ref s) => write!(f, "{}", s),
-        }
-    }
-}
-
-
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone)]
-pub enum Expected {
-    Byte(u8),
-    ByteRange(u8, u8),
-    Char(char),
-    CharRange(char, char),
-    Custom(String),
-    OneOf(Vec<Expected>),
-    Or(Box<Expected>, Box<Expected>),
-}
-
-impl Expected {
-    pub fn one_of(mut elems: Vec<Expected>) -> Expected {
-        if elems.len() == 1 {
-            elems.pop().unwrap()
-        } else {
-            elems.sort();
-            Expected::OneOf(elems)
-        }
-    }
-}
-
-impl std::fmt::Display for Expected {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            Expected::Byte(b) => write!(f, "0x{:02X}", b),
-            Expected::ByteRange(a, b) => write!(f, "[0x{:02X}-0x{:02X}]", a, b),
-            Expected::Char(c) => write!(f, "{:?}", c),
-            Expected::CharRange(a, b) => write!(f, "[{:?}-{:?}]", a, b),
-            Expected::Custom(ref s) => write!(f, "{}", s),
-            Expected::OneOf(ref e) => write!(f, "one of: {}", ListDisplay(e)),
-            Expected::Or(ref a, ref b) => write!(f, "{} or {}", a, b),
-        }
-    }
-}
 
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -78,19 +23,11 @@ pub enum IoErrorDetail {
         path: PathBuf,
     },
     Utf8InvalidEncoding {
-        pos: Position,
+        offset: usize,
         len: usize,
     },
-    UnexpectedEof {
-        pos: Position,
-        expected: Option<Box<Expected>>,
-        task: String,
-    },
-    UnexpectedInput {
-        pos: Position,
-        found: Input,
-        expected: Option<Box<Expected>>,
-        task: String,
+    Utf8UnexpectedEof {
+        offset: usize,
     },
     Fmt,
 }
@@ -103,8 +40,7 @@ impl IoErrorDetail {
             IoErrorDetail::CurrentDirGet { kind, .. } => kind,
             IoErrorDetail::CurrentDirSet { kind, .. } => kind,
             IoErrorDetail::Utf8InvalidEncoding { .. } => std::io::ErrorKind::InvalidData,
-            IoErrorDetail::UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
-            IoErrorDetail::UnexpectedInput { .. } => std::io::ErrorKind::InvalidData,
+            IoErrorDetail::Utf8UnexpectedEof { .. } => std::io::ErrorKind::UnexpectedEof,
             IoErrorDetail::Fmt => std::io::ErrorKind::Other,
         }
     }
@@ -126,8 +62,7 @@ impl Detail for IoErrorDetail {
             IoErrorDetail::CurrentDirGet { kind } => 1 + kind as u32,
             IoErrorDetail::CurrentDirSet { kind, .. } => 1 + kind as u32,
             IoErrorDetail::Utf8InvalidEncoding { .. } => 21,
-            IoErrorDetail::UnexpectedEof { .. } => 22,
-            IoErrorDetail::UnexpectedInput { .. } => 23,
+            IoErrorDetail::Utf8UnexpectedEof { .. } => 22,
             IoErrorDetail::Fmt => 99,
         }
     }
@@ -192,20 +127,11 @@ impl std::fmt::Display for IoErrorDetail {
                     kind_str(kind)
                 )?;
             }
-            IoErrorDetail::Utf8InvalidEncoding { pos, .. } => {
-                write!(f, "invalid utf-8 encoding at {} (offset {})", pos, pos.offset)?;
+            IoErrorDetail::Utf8InvalidEncoding { offset, len: _ } => {
+                write!(f, "invalid utf-8 encoding at offset {}", offset)?;
             }
-            IoErrorDetail::UnexpectedEof { pos, ref expected, ref task } => {
-                write!(f, "unexpected end of input at {} while {}", pos, task)?;
-                if let Some(e) = expected {
-                    write!(f, ", expecting {}", e)?;
-                }
-            }
-            IoErrorDetail::UnexpectedInput { pos, ref found, ref expected, ref task } => {
-                write!(f, "unexpected {} at {} while {}", found, pos, task)?;
-                if let Some(e) = expected {
-                    write!(f, ", expecting {}", e)?;
-                }
+            IoErrorDetail::Utf8UnexpectedEof { offset } => {
+                write!(f, "unexpected <EOF> in utf-8 encoding at offset {}", offset)?;
             }
             IoErrorDetail::Fmt => {
                 write!(f, "formatting error")?;

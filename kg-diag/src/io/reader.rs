@@ -4,6 +4,7 @@ use std::path::Path;
 
 use super::*;
 
+
 pub trait Reader {
     fn path(&self) -> Option<&Path>;
 
@@ -179,16 +180,14 @@ impl<'a> MemCharReader<'a> {
 
     fn encoding_err<T>(&mut self, len: usize) -> IoResult<T> {
         Err(IoErrorDetail::Utf8InvalidEncoding {
-            pos: self.pos,
+            offset: self.pos.offset,
             len,
         })
     }
 
     fn eof_err<T>(&mut self) -> IoResult<T> {
-        Err(IoErrorDetail::UnexpectedEof {
-            pos: self.pos,
-            expected: None,
-            task: "decoding UTF-8".into()
+        Err(IoErrorDetail::Utf8UnexpectedEof {
+            offset: self.pos.offset,
         })
     }
 
@@ -438,16 +437,14 @@ impl<'a> MemByteReader<'a> {
 
     fn encoding_err<T>(&mut self, len: usize) -> IoResult<T> {
         Err(IoErrorDetail::Utf8InvalidEncoding {
-            pos: self.pos,
+            offset: self.pos.offset,
             len,
         })
     }
 
     fn eof_err<T>(&mut self) -> IoResult<T> {
-        Err(IoErrorDetail::UnexpectedEof {
-            pos: self.pos,
-            expected: None,
-            task: "decoding utf-8".into()
+        Err(IoErrorDetail::Utf8UnexpectedEof {
+            offset: self.pos.offset,
         })
     }
 }
@@ -552,8 +549,7 @@ impl<'a> ByteReader for MemByteReader<'a> {
                 } else if b >= 0b11000000 {
                     self.left -= 1;
                 } else {
-                    let len = self.left;
-                    return self.encoding_err(len);
+                    return self.encoding_err(self.left);
                 }
                 Ok(Some(b))
             }
@@ -625,8 +621,8 @@ mod tests {
             let err = r.next_char().expect_err("Error expected");
 
             match err {
-                IoErrorDetail::Utf8InvalidEncoding { pos, len } => {
-                    assert_eq!(pos.offset, 2);
+                IoErrorDetail::Utf8InvalidEncoding { offset, len } => {
+                    assert_eq!(offset, 2);
                     assert_eq!(len, 4);
                 }
                 _ => panic!("wrong detail in error"),

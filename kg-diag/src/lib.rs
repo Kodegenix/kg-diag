@@ -9,7 +9,7 @@ pub use self::detail::{Detail, Severity, DetailExt};
 pub use self::diag::{BasicDiag, Diag, ParseDiag, SimpleDiag};
 pub use self::io::{
     ByteReader, CharReader, FileBuffer, FileType, IoErrorDetail, IoResult, LexTerm, LexToken,
-    MemByteReader, MemCharReader, OpType, ParseResult, Position, Quote, Reader, Span,
+    MemByteReader, MemCharReader, OpType, Position, Quote, Reader, Span,
 };
 pub use self::multi::{Diags, Errors};
 pub use self::stacktrace::Stacktrace;
@@ -17,6 +17,7 @@ pub use self::stacktrace::Stacktrace;
 mod detail;
 mod diag;
 pub mod io;
+pub mod parse;
 mod multi;
 mod stacktrace;
 
