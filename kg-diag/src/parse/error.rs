@@ -56,6 +56,18 @@ impl std::fmt::Display for Expected {
         }
     }
 }
+
+
+#[derive(Display, Debug, Eq, PartialEq, Clone, Copy)]
+pub enum NumericalErrorKind {
+    #[display("overflow")]
+    IntOverflow,
+    #[display("underflow")]
+    IntUnderflow,
+    #[display("invalid format error")]
+    Invalid,
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ParseErrorDetail {
     Io(IoErrorDetail),
@@ -70,6 +82,10 @@ pub enum ParseErrorDetail {
         expected: Option<Expected>,
         task: String,
     },
+    Numerical {
+        span: Span,
+        kind: NumericalErrorKind,
+    }
 }
 
 impl Detail for ParseErrorDetail {
@@ -78,6 +94,7 @@ impl Detail for ParseErrorDetail {
             ParseErrorDetail::Io(ref err) => err.code(),
             ParseErrorDetail::UnexpectedEof { .. } => 40,
             ParseErrorDetail::UnexpectedInput { .. } => 41,
+            ParseErrorDetail::Numerical { .. } => 42,
         }
     }
 }
@@ -103,6 +120,9 @@ impl std::fmt::Display for ParseErrorDetail {
                 if let Some(e) = expected {
                     write!(f, ", expecting {}", e)?;
                 }
+            }
+            ParseErrorDetail::Numerical { span, kind } => {
+                write!(f, "{} while converting number literal at {}", kind, span)?;
             }
         }
         Ok(())

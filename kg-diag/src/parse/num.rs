@@ -19,6 +19,19 @@ pub enum Notation {
     Binary,
 }
 
+impl Notation {
+    #[inline]
+    pub fn radix(&self) -> u32 {
+        match *self {
+            Notation::Decimal | Notation::Float | Notation::Exponent => 10,
+            Notation::Hex => 16,
+            Notation::Octal => 8,
+            Notation::Binary => 2,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Sign {
     #[display("")]
@@ -29,11 +42,22 @@ pub enum Sign {
     Plus,
 }
 
+impl Sign {
+    #[inline]
+    fn len(&self) -> usize {
+        match *self {
+            Sign::None => 0,
+            _ => 1,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 #[display("{sign}{notation}")]
 pub struct Number {
-    notation: Notation,
     sign: Sign,
+    notation: Notation,
 }
 
 impl Number {
@@ -43,8 +67,15 @@ impl Number {
             sign,
         }
     }
-}
 
+    pub fn sign(&self) -> Sign {
+        self.sign
+    }
+
+    pub fn notation(&self) -> Notation {
+        self.notation
+    }
+}
 
 impl LexTerm for Number {}
 
@@ -101,11 +132,44 @@ fn parse_simple_num<N: NotationConfig>(n: &N,
 }
 
 
+fn map_int_result<T>(result: Result<T, std::num::ParseIntError>, n: &LexToken<Number>) -> ParseResult<T> {
+    use std::num::IntErrorKind;
+    match result {
+        Ok(num) => Ok(num),
+        Err(err) => Err(ParseErrorDetail::Numerical {
+            span: n.span(),
+            kind: match *err.kind() {
+                IntErrorKind::Overflow => NumericalErrorKind::IntOverflow,
+                IntErrorKind::Underflow => NumericalErrorKind::IntUnderflow,
+                _ => NumericalErrorKind::Invalid,
+            }
+        })
+    }
+}
+
+macro_rules! convert_int {
+    ($fn_name:ident, $int_ty: ty) => {
+        pub fn $fn_name(&mut self, n: & LexToken<Number>, r: & mut dyn CharReader) -> ParseResult<$int_ty> {
+            let number = n.term();
+            if number.sign() == Sign::Minus && <$int_ty>::min_value() == 0 {
+                return Err(ParseErrorDetail::Numerical {
+                    span: n.span(),
+                    kind: NumericalErrorKind::IntUnderflow,
+                });
+            }
+            let s = self.get_num_slice(n, r)?;
+            map_int_result(<$int_ty>::from_str_radix(s.as_ref(), number.notation().radix()), n)
+        }
+    };
+}
+
+
 pub struct NumberParser {
     pub decimal: DecimalConfig,
     pub hex: HexConfig,
     pub octal: OctalConfig,
     pub binary: BinaryConfig,
+    buffer: String,
 }
 
 impl NumberParser {
@@ -115,6 +179,7 @@ impl NumberParser {
             hex: HexConfig::new(),
             octal: OctalConfig::new(),
             binary: BinaryConfig::new(),
+            buffer: String::new(),
         }
     }
 
@@ -224,11 +289,13 @@ impl NumberParser {
             let expected = match last {
                 ' ' | '.' => {
                     let mut expected = Vec::new();
-                    if self.decimal.allow_minus {
-                        expected.push(Expected::Char('-'));
-                    }
-                    if self.decimal.allow_plus {
-                        expected.push(Expected::Char('+'));
+                    if sign == Sign::None {
+                        if self.decimal.allow_minus {
+                            expected.push(Expected::Char('-'));
+                        }
+                        if self.decimal.allow_plus {
+                            expected.push(Expected::Char('+'));
+                        }
                     }
                     expected.push(Expected::CharRange('0', '9'));
                     Expected::one_of(expected)
@@ -261,6 +328,76 @@ impl NumberParser {
             })
         }
     }
+
+    fn get_num_slice(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> IoResult<&str> {
+        let number = n.term();
+        self.buffer.clear();
+        match number.notation() {
+            Notation::Decimal | Notation::Float | Notation::Exponent => {
+                let s = r.slice_pos(n.from(), n.to())?;
+                if self.decimal.allow_underscores {
+                    for c in s.chars() {
+                        if c != '_' {
+                            self.buffer.push(c);
+                        }
+                    }
+                } else {
+                    self.buffer.push_str(&s);
+                }
+            }
+            Notation::Hex => {
+                if number.sign() == Sign::Minus {
+                    self.buffer.push('-');
+                }
+                let s = r.slice(n.from().offset + number.sign().len() + self.hex.prefix.len(), n.to().offset)?;
+                if self.hex.allow_underscores {
+                    for c in s.chars() {
+                        if c != '_' {
+                            self.buffer.push(c);
+                        }
+                    }
+                } else {
+                    self.buffer.push_str(&s);
+                }
+            }
+            Notation::Octal => {
+                if number.sign() == Sign::Minus {
+                    self.buffer.push('-');
+                }
+                let s = r.slice(n.from().offset + number.sign().len() + self.octal.prefix.len(), n.to().offset)?;
+                if self.octal.allow_underscores {
+                    for c in s.chars() {
+                        if c != '_' {
+                            self.buffer.push(c);
+                        }
+                    }
+                } else {
+                    self.buffer.push_str(&s);
+                }
+            }
+            Notation::Binary => {
+                if number.sign() == Sign::Minus {
+                    self.buffer.push('-');
+                }
+                let s = r.slice(n.from().offset + number.sign().len() + self.binary.prefix.len(), n.to().offset)?;
+                if self.binary.allow_underscores {
+                    for c in s.chars() {
+                        if c != '_' {
+                            self.buffer.push(c);
+                        }
+                    }
+                } else {
+                    self.buffer.push_str(&s);
+                }
+            }
+        }
+        Ok(&self.buffer)
+    }
+
+    convert_int!(convert_u8, u8);
+    convert_int!(convert_i8, i8);
+    convert_int!(convert_u16, u16);
+    convert_int!(convert_i16, i16);
 }
 
 
@@ -272,7 +409,7 @@ pub enum Case {
 }
 
 
-trait NotationConfig {
+trait NotationConfig: Sized {
     fn is_enabled(&self) -> bool;
 
     fn allow_plus(&self) -> bool;
@@ -290,21 +427,33 @@ trait NotationConfig {
     }
 
     fn is_at_start(&self, r: &mut dyn CharReader) -> IoResult<bool> {
-        Ok(if self.is_enabled() {
+        #[inline]
+        fn is_at_prefix_or_digit<N: NotationConfig>(n: &N, r: &mut dyn CharReader) -> IoResult<bool> {
+            if n.prefix().is_empty() {
+                Ok(if let Some(c) = r.peek_char(0)? {
+                    n.is_digit(c)
+                } else {
+                    false
+                })
+            } else {
+                r.match_str(n.prefix())
+            }
+        }
+
+        if self.is_enabled() {
             if let Some(c) = r.peek_char(0)? {
                 if (c == '-' && self.allow_minus()) || (c == '+' && self.allow_plus()) {
-                    true
-                } else if self.prefix().is_empty() {
-                    self.is_digit(c)
+                    let p = r.position();
+                    r.skip_chars(1)?;
+                    let res = is_at_prefix_or_digit(self, r);
+                    r.seek(p)?;
+                    return res;
                 } else {
-                    r.match_str(self.prefix())?
+                    return is_at_prefix_or_digit(self, r);
                 }
-            } else {
-                false
             }
-        } else {
-            false
-        })
+        }
+        Ok(false)
     }
 
     fn is_digit(&self, c: char) -> bool;
@@ -363,6 +512,19 @@ impl NotationConfig for DecimalConfig {
 
     fn case(&self) -> Case {
         self.case
+    }
+
+    fn is_at_start(&self, r: &mut dyn CharReader) -> IoResult<bool> {
+        if self.is_enabled() {
+            if let Some(c) = r.peek_char(0)? {
+                if (c == '-' && self.allow_minus()) || (c == '+' && self.allow_plus()) {
+                    return Ok(true);
+                } else {
+                    return Ok(self.is_digit(c));
+                }
+            }
+        }
+        Ok(false)
     }
 
     fn is_digit(&self, c: char) -> bool {
@@ -580,12 +742,15 @@ mod tests {
 
     #[test]
     fn can_parse_decimal() {
-        let np = NumberParser::new();
+        let mut np = NumberParser::new();
 
-        let mut r = MemCharReader::new(b"- ");
+        let mut r = MemCharReader::new(b"12 ");
 
         match np.parse_number(&mut r) {
-            Ok(n) => println!("{} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap()),
+            Ok(n) => {
+                println!("{} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap());
+                println!("{:?}", np.convert_u8(&n, &mut r));
+            },
             Err(err) => println!("{}", err),
         }
     }
