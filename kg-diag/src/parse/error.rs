@@ -61,9 +61,9 @@ impl std::fmt::Display for Expected {
 #[derive(Display, Debug, Eq, PartialEq, Clone, Copy)]
 pub enum NumericalErrorKind {
     #[display("overflow")]
-    IntOverflow,
+    Overflow,
     #[display("underflow")]
-    IntUnderflow,
+    Underflow,
     #[display("invalid format error")]
     Invalid,
 }

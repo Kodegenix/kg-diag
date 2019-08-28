@@ -291,6 +291,14 @@ impl<T: LexTerm + Clone + Copy> LexToken<T> {
         self.span.to
     }
 
+    pub fn from_offset(&self) -> usize {
+        self.span.from.offset
+    }
+
+    pub fn to_offset(&self) -> usize {
+        self.span.to.offset
+    }
+
     pub fn span(&self) -> Span {
         self.span
     }

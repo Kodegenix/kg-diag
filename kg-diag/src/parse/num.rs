@@ -132,38 +132,6 @@ fn parse_simple_num<N: NotationConfig>(n: &N,
 }
 
 
-fn map_int_result<T>(result: Result<T, std::num::ParseIntError>, n: &LexToken<Number>) -> ParseResult<T> {
-    use std::num::IntErrorKind;
-    match result {
-        Ok(num) => Ok(num),
-        Err(err) => Err(ParseErrorDetail::Numerical {
-            span: n.span(),
-            kind: match *err.kind() {
-                IntErrorKind::Overflow => NumericalErrorKind::IntOverflow,
-                IntErrorKind::Underflow => NumericalErrorKind::IntUnderflow,
-                _ => NumericalErrorKind::Invalid,
-            }
-        })
-    }
-}
-
-macro_rules! convert_int {
-    ($fn_name:ident, $int_ty: ty) => {
-        pub fn $fn_name(&mut self, n: & LexToken<Number>, r: & mut dyn CharReader) -> ParseResult<$int_ty> {
-            let number = n.term();
-            if number.sign() == Sign::Minus && <$int_ty>::min_value() == 0 {
-                return Err(ParseErrorDetail::Numerical {
-                    span: n.span(),
-                    kind: NumericalErrorKind::IntUnderflow,
-                });
-            }
-            let s = self.get_num_slice(n, r)?;
-            map_int_result(<$int_ty>::from_str_radix(s.as_ref(), number.notation().radix()), n)
-        }
-    };
-}
-
-
 pub struct NumberParser {
     pub decimal: DecimalConfig,
     pub hex: HexConfig,
@@ -329,75 +297,46 @@ impl NumberParser {
         }
     }
 
-    fn get_num_slice(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> IoResult<&str> {
-        let number = n.term();
-        self.buffer.clear();
-        match number.notation() {
-            Notation::Decimal | Notation::Float | Notation::Exponent => {
-                let s = r.slice_pos(n.from(), n.to())?;
-                if self.decimal.allow_underscores {
-                    for c in s.chars() {
-                        if c != '_' {
-                            self.buffer.push(c);
-                        }
-                    }
-                } else {
-                    self.buffer.push_str(&s);
-                }
+    pub fn convert_number<N: Numerical>(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
+        let notation = n.term().notation();
+        let sign = n.term().sign();
+        let res = match notation {
+            Notation::Decimal => {
+                let s = r.slice(n.from_offset() + sign.len(), n.to_offset())?;
+                parse_decimal(sign, s.as_bytes())
             }
             Notation::Hex => {
-                if number.sign() == Sign::Minus {
-                    self.buffer.push('-');
-                }
-                let s = r.slice(n.from().offset + number.sign().len() + self.hex.prefix.len(), n.to().offset)?;
-                if self.hex.allow_underscores {
-                    for c in s.chars() {
-                        if c != '_' {
-                            self.buffer.push(c);
-                        }
-                    }
-                } else {
-                    self.buffer.push_str(&s);
-                }
+                let s = r.slice(n.from_offset() + sign.len() + self.hex.prefix.len(), n.to_offset())?;
+                parse_hex(sign, s.as_bytes())
             }
             Notation::Octal => {
-                if number.sign() == Sign::Minus {
-                    self.buffer.push('-');
-                }
-                let s = r.slice(n.from().offset + number.sign().len() + self.octal.prefix.len(), n.to().offset)?;
-                if self.octal.allow_underscores {
-                    for c in s.chars() {
-                        if c != '_' {
-                            self.buffer.push(c);
-                        }
-                    }
-                } else {
-                    self.buffer.push_str(&s);
-                }
+                let s = r.slice(n.from_offset() + sign.len() + self.octal.prefix.len(), n.to_offset())?;
+                parse_octal(sign, s.as_bytes())
             }
             Notation::Binary => {
-                if number.sign() == Sign::Minus {
-                    self.buffer.push('-');
-                }
-                let s = r.slice(n.from().offset + number.sign().len() + self.binary.prefix.len(), n.to().offset)?;
-                if self.binary.allow_underscores {
+                let s = r.slice(n.from_offset() + sign.len() + self.binary.prefix.len(), n.to_offset())?;
+                parse_binary(sign, s.as_bytes())
+            }
+            Notation::Float | Notation::Exponent => {
+                let s = r.slice(n.from_offset(), n.to_offset())?;
+                if self.decimal.allow_underscores {
+                    self.buffer.clear();
                     for c in s.chars() {
                         if c != '_' {
                             self.buffer.push(c);
                         }
                     }
+                    N::from_float_str(&self.buffer)
                 } else {
-                    self.buffer.push_str(&s);
+                    N::from_float_str(&s)
                 }
             }
-        }
-        Ok(&self.buffer)
+        };
+        res.map_err(|err| ParseErrorDetail::Numerical {
+            span: n.span(),
+            kind: err,
+        })
     }
-
-    convert_int!(convert_u8, u8);
-    convert_int!(convert_i8, i8);
-    convert_int!(convert_u16, u16);
-    convert_int!(convert_i16, i16);
 }
 
 
@@ -735,23 +674,388 @@ impl NotationConfig for BinaryConfig {
     }
 }
 
+pub trait Numerical: Copy {
+    fn from_u8(d: u8) -> Self;
+    fn from_float_str(s: &str) -> Result<Self, NumericalErrorKind>;
+    fn add(a: Self, b: Self) -> Option<Self>;
+    fn sub(a: Self, b: Self) -> Option<Self>;
+    fn mul2(a: Self) -> Option<Self>;
+    fn mul8(a: Self) -> Option<Self>;
+    fn mul10(a: Self) -> Option<Self>;
+    fn mul16(a: Self) -> Option<Self>;
+}
+
+macro_rules! impl_numerical {
+    ($ty: ty) => {
+        impl Numerical for $ty {
+            #[inline(always)]
+            fn from_u8(d: u8) -> Self {
+                d as $ty
+            }
+
+            #[inline(always)]
+            fn from_float_str(s: &str) -> Result<Self, NumericalErrorKind> {
+                let d: f64 = match s.parse::<f64>() {
+                    Ok(d) => d,
+                    Err(_) => return Err(NumericalErrorKind::Invalid),
+                };
+                let min = Self::min_value() as f64;
+                let max = Self::max_value() as f64;
+                if d < min {
+                    Err(NumericalErrorKind::Underflow)
+                } else if d > max {
+                    Err(NumericalErrorKind::Overflow)
+                } else {
+                    Ok(d as $ty)
+                }
+            }
+
+            #[inline(always)]
+            fn add(a: Self, b: Self) -> Option<Self> {
+                Self::checked_add(a, b)
+            }
+
+            #[inline(always)]
+            fn sub(a: Self, b: Self) -> Option<Self> {
+                Self::checked_sub(a, b)
+            }
+
+            #[inline(always)]
+            fn mul2(a: Self) -> Option<Self> {
+                Self::checked_mul(a, 2 as $ty)
+            }
+
+            #[inline(always)]
+            fn mul8(a: Self) -> Option<Self> {
+                Self::checked_mul(a, 8 as $ty)
+            }
+
+            #[inline(always)]
+            fn mul10(a: Self) -> Option<Self> {
+                Self::checked_mul(a, 10 as $ty)
+            }
+
+            #[inline(always)]
+            fn mul16(a: Self) -> Option<Self> {
+                Self::checked_mul(a, 16 as $ty)
+            }
+        }
+    }
+}
+
+impl_numerical!(u8);
+impl_numerical!(i8);
+impl_numerical!(u16);
+impl_numerical!(i16);
+impl_numerical!(u32);
+impl_numerical!(i32);
+impl_numerical!(u64);
+impl_numerical!(i64);
+impl_numerical!(u128);
+impl_numerical!(i128);
+impl_numerical!(usize);
+impl_numerical!(isize);
+
+impl Numerical for f32 {
+    #[inline(always)]
+    fn from_u8(d: u8) -> Self {
+        d as f32
+    }
+
+    #[inline(always)]
+    fn from_float_str(s: &str) -> Result<Self, NumericalErrorKind> {
+        s.parse::<f32>().map_err(|_| NumericalErrorKind::Invalid)
+    }
+
+    #[inline(always)]
+    fn add(a: Self, b: Self) -> Option<Self> {
+        Some(a + b)
+    }
+
+    #[inline(always)]
+    fn sub(a: Self, b: Self) -> Option<Self> {
+        Some(a - b)
+    }
+
+    #[inline(always)]
+    fn mul2(a: Self) -> Option<Self> {
+        Some(a * 2f32)
+    }
+
+    #[inline(always)]
+    fn mul8(a: Self) -> Option<Self> {
+        Some(a * 8f32)
+    }
+
+    #[inline(always)]
+    fn mul10(a: Self) -> Option<Self> {
+        Some(a * 10f32)
+    }
+
+    #[inline(always)]
+    fn mul16(a: Self) -> Option<Self> {
+        Some(a * 16f32)
+    }
+}
+
+impl Numerical for f64 {
+    #[inline(always)]
+    fn from_u8(d: u8) -> Self {
+        d as f64
+    }
+
+    #[inline(always)]
+    fn from_float_str(s: &str) -> Result<Self, NumericalErrorKind> {
+        s.parse::<f64>().map_err(|_| NumericalErrorKind::Invalid)
+    }
+
+    #[inline(always)]
+    fn add(a: Self, b: Self) -> Option<Self> {
+        Some(a + b)
+    }
+
+    #[inline(always)]
+    fn sub(a: Self, b: Self) -> Option<Self> {
+        Some(a - b)
+    }
+
+    #[inline(always)]
+    fn mul2(a: Self) -> Option<Self> {
+        Some(a * 2f64)
+    }
+
+    #[inline(always)]
+    fn mul8(a: Self) -> Option<Self> {
+        Some(a * 8f64)
+    }
+
+    #[inline(always)]
+    fn mul10(a: Self) -> Option<Self> {
+        Some(a * 10f64)
+    }
+
+    #[inline(always)]
+    fn mul16(a: Self) -> Option<Self> {
+        Some(a * 16f64)
+    }
+}
+
+fn digit_dec<N: Numerical>(d: u8) -> N {
+    N::from_u8(d - b'0')
+}
+
+fn digit_hex<N: Numerical>(d: u8) -> N {
+    if d >= b'a' {
+        N::from_u8(d - b'a' + 10u8)
+    } else if d >= b'A' {
+        N::from_u8(d - b'A' + 10u8)
+    } else {
+        N::from_u8(d - b'0')
+    }
+}
+
+fn parse_decimal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind> {
+    let mut n = N::from_u8(0);
+    if sign != Sign::Minus {
+        for &d in s {
+            if d != b'_' {
+                match N::mul10(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+                match N::add(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+            }
+        }
+    } else {
+        for &d in s {
+            if d != b'_' {
+                match N::mul10(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+                match N::sub(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+            }
+        }
+    }
+    Ok(n)
+}
+
+fn parse_octal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind> {
+    let mut n = N::from_u8(0);
+    if sign != Sign::Minus {
+        for &d in s {
+            if d != b'_' {
+                match N::mul8(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+                match N::add(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+            }
+        }
+    } else {
+        for &d in s {
+            if d != b'_' {
+                match N::mul8(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+                match N::sub(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+            }
+        }
+    }
+    Ok(n)
+}
+
+fn parse_binary<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind> {
+    let mut n = N::from_u8(0);
+    if sign != Sign::Minus {
+        for &d in s {
+            if d != b'_' {
+                match N::mul2(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+                match N::add(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+            }
+        }
+    } else {
+        for &d in s {
+            if d != b'_' {
+                match N::mul2(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+                match N::sub(n, digit_dec(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+            }
+        }
+    }
+    Ok(n)
+}
+
+fn parse_hex<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind> {
+    let mut n = N::from_u8(0);
+    if sign != Sign::Minus {
+        for &d in s {
+            if d != b'_' {
+                match N::mul16(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+                match N::add(n, digit_hex(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Overflow),
+                }
+            }
+        }
+    } else {
+        for &d in s {
+            if d != b'_' {
+                match N::mul16(n) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+                match N::sub(n, digit_hex(d)) {
+                    Some(a) => n = a,
+                    None => return Err(NumericalErrorKind::Underflow),
+                }
+            }
+        }
+    }
+    Ok(n)
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn can_parse_exponent() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"-123456.8e-3");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::Minus);
+        assert_eq!(n.term().notation(), Notation::Exponent);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), -123);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), -123.4568f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), -123.4568f64);
+    }
+
+    #[test]
     fn can_parse_decimal() {
         let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"-123456");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::Minus);
+        assert_eq!(n.term().notation(), Notation::Decimal);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), -123456);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), -123456f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), -123456f64);
+    }
 
-        let mut r = MemCharReader::new(b"12 ");
+    #[test]
+    fn can_parse_float() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"123.456");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::None);
+        assert_eq!(n.term().notation(), Notation::Float);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 123);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 123.456f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 123.456f64);
+    }
 
-        match np.parse_number(&mut r) {
-            Ok(n) => {
-                println!("{} {:?}", n, r.slice_pos(n.from(), n.to()).unwrap());
-                println!("{:?}", np.convert_u8(&n, &mut r));
-            },
-            Err(err) => println!("{}", err),
-        }
+    #[test]
+    fn can_parse_hex() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"0xaaff");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::None);
+        assert_eq!(n.term().notation(), Notation::Hex);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0xAAFF);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0xAAFF as f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0xAAFF as f64);
+    }
+
+    #[test]
+    fn can_parse_octal() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"0o777");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::None);
+        assert_eq!(n.term().notation(), Notation::Octal);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0o777);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0o777 as f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0o777 as f64);
+    }
+
+    #[test]
+    fn can_parse_binary() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"0b10010011");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::None);
+        assert_eq!(n.term().notation(), Notation::Binary);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0b10010011);
+        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0b10010011 as f32);
+        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0b10010011 as f64);
     }
 }

@@ -1,4 +1,4 @@
-#![feature(box_syntax, specialization, raw, int_error_matching)]
+#![feature(box_syntax, specialization, raw, int_error_matching, concat_idents)]
 
 #[macro_use]
 extern crate kg_display_derive;
