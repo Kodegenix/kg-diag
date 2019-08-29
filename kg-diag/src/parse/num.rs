@@ -840,10 +840,12 @@ impl Numerical for f64 {
     }
 }
 
+#[inline]
 fn digit_dec<N: Numerical>(d: u8) -> N {
     N::from_u8(d - b'0')
 }
 
+#[inline]
 fn digit_hex<N: Numerical>(d: u8) -> N {
     if d >= b'a' {
         N::from_u8(d - b'a' + 10u8)
