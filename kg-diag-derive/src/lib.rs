@@ -14,6 +14,13 @@ struct DiagAttr {
     severity: Severity,
 }
 
+fn path_eq(path: &syn::Path, s: &str) -> bool {
+    if let Some(ident) = path.get_ident() {
+        return ident == s;
+    }
+    false
+}
+
 fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut code_offset: u32 = 0;
     let mut severity = Severity::Failure;
@@ -23,17 +30,17 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
         for p in params {
             match p {
                 syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                    ref ident,
+                    ref path,
                     lit: syn::Lit::Int(ref i),
                     ..
-                })) if ident == "code_offset" => {
-                    code_offset = i.value() as u32;
+                })) if path_eq(path, "code_offset") => {
+                    code_offset = i.base10_parse().unwrap_or_default();
                 }
                 syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                    ref ident,
+                    ref path,
                     lit: syn::Lit::Str(ref s),
                     ..
-                })) if ident == "severity" => match Severity::try_from(s.value().as_ref()) {
+                })) if path_eq(path, "severity") => match Severity::try_from(s.value().as_ref()) {
                     Ok(s) => severity = s,
                     Err(value) => panic!(format!(
                         "invalid default severity \"{}\" for type {}",
@@ -42,10 +49,10 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
                     )),
                 },
                 syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                    ref ident,
+                    ref path,
                     lit: syn::Lit::Char(ref c),
                     ..
-                })) if ident == "severity" => match Severity::try_from(c.value()) {
+                })) if path_eq(path, "severity") => match Severity::try_from(c.value()) {
                     Ok(s) => severity = s,
                     Err(value) => panic!(format!(
                         "invalid default severity '{}' for type {}",
@@ -76,17 +83,17 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
             for p in params {
                 match p {
                     syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                        ref ident,
+                        ref path,
                         lit: syn::Lit::Int(ref i),
                         ..
-                    })) if ident == "code" => {
-                        a.code = code_offset + i.value() as u32;
+                    })) if path_eq(path, "code") => {
+                        a.code = code_offset + i.base10_parse::<u32>().unwrap_or_default();
                     }
                     syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                        ref ident,
+                        ref path,
                         lit: syn::Lit::Str(ref s),
                         ..
-                    })) if ident == "severity" => match Severity::try_from(s.value().as_ref()) {
+                    })) if path_eq(path, "severity") => match Severity::try_from(s.value().as_ref()) {
                         Ok(s) => a.severity = s,
                         Err(value) => panic!(format!(
                             "invalid severity \"{}\" for variant {}",
@@ -95,10 +102,10 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
                         )),
                     },
                     syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
-                        ref ident,
+                        ref path,
                         lit: syn::Lit::Char(ref c),
                         ..
-                    })) if ident == "severity" => match Severity::try_from(c.value()) {
+                    })) if path_eq(path, "severity") => match Severity::try_from(c.value()) {
                         Ok(s) => a.severity = s,
                         Err(value) => panic!(format!(
                             "invalid severity '{}' for variant {}",
@@ -183,9 +190,9 @@ fn find_nested_attr(attrs: &[syn::Attribute], id: &str) -> Option<Vec<syn::Neste
     for attr in attrs {
         if attr.path != doc_path && attr.style == syn::AttrStyle::Outer {
             let meta = {
-                let m = attr.interpret_meta();
-                if let Some(syn::Meta::List(syn::MetaList { ident, nested, .. })) = m {
-                    if ident == id {
+                let m = attr.parse_meta();
+                if let Ok(syn::Meta::List(syn::MetaList { path, nested, .. })) = m {
+                    if path_eq(&path, id) {
                         Some(nested.into_iter().collect())
                     } else {
                         None
