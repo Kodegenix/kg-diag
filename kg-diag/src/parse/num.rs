@@ -68,6 +68,13 @@ impl Number {
         }
     }
 
+    pub fn token(span: Span, notation: Notation, sign: Sign) -> LexToken<Number> {
+        LexToken::new(Number {
+            notation,
+            sign,
+        }, span.from, span.to)
+    }
+
     pub fn sign(&self) -> Sign {
         self.sign
     }
@@ -339,6 +346,17 @@ impl NumberParser {
     }
 }
 
+impl std::fmt::Debug for NumberParser {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("NumberParser")
+            .field("decimal", &self.decimal)
+            .field("hex", &self.hex)
+            .field("octal", &self.octal)
+            .field("binary", &self.binary)
+            .finish()
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Case {
@@ -407,6 +425,7 @@ trait NotationConfig: Sized {
 }
 
 
+#[derive(Debug)]
 pub struct DecimalConfig {
     pub enabled: bool,
     pub allow_minus: bool,
@@ -484,6 +503,7 @@ impl NotationConfig for DecimalConfig {
 }
 
 
+#[derive(Debug)]
 pub struct HexConfig {
     pub enabled: bool,
     pub allow_minus: bool,
@@ -557,6 +577,7 @@ impl NotationConfig for HexConfig {
 }
 
 
+#[derive(Debug)]
 pub struct OctalConfig {
     pub enabled: bool,
     pub allow_minus: bool,
@@ -616,6 +637,7 @@ impl NotationConfig for OctalConfig {
 }
 
 
+#[derive(Debug)]
 pub struct BinaryConfig {
     pub enabled: bool,
     pub allow_minus: bool,

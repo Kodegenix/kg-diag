@@ -1,6 +1,6 @@
 [package]
 name = "kg-diag-derive"
-version = "0.2.3"
+version = "0.3.0"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 description = """
 Macro implementation for #[derive(Detail)].
@@ -15,7 +15,7 @@ edition = "2018"
 proc-macro = true
 
 [dependencies]
-kg-diag = { version = "0.2.7", path = "../kg-diag" }
+kg-diag = { version = "0.3.0", path = "../kg-diag" }
 proc-macro2 = { version = "1.0.1", features = ["nightly"] }
 quote = "1.0.2"
 syn = { version = "1.0.5", features = ["full"] }
