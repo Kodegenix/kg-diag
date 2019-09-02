@@ -21,7 +21,6 @@ pub struct Position {
     pub column: u32,
 }
 
-#[allow(unused)]
 impl Position {
     pub fn new() -> Position {
         Position {

@@ -244,8 +244,8 @@ impl NumberParser {
                 } else if c == '.' && self.decimal.allow_float && last == '0' && notation == Some(Notation::Decimal) {
                     last = '.';
                 } else if ((c == 'e' && self.decimal.case != Case::Upper)
-                        || (c == 'E' && self.decimal.case != Case::Lower))
-                        && self.decimal.allow_exponent && last == '0' && notation != Some(Notation::Exponent) {
+                    || (c == 'E' && self.decimal.case != Case::Lower))
+                    && self.decimal.allow_exponent && last == '0' && notation != Some(Notation::Exponent) {
                     last = 'e';
                 } else if (c == '-' || c == '+') && last == 'e' {
                     last = '-';
@@ -258,50 +258,62 @@ impl NumberParser {
 
         let p2 = r.position();
 
-        if notation.is_some() && last == '0' {
-            Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p2))
-        } else {
-            let expected = match last {
-                ' ' | '.' => {
-                    let mut expected = Vec::new();
-                    if sign == Sign::None {
-                        if self.decimal.allow_minus {
-                            expected.push(Expected::Char('-'));
-                        }
-                        if self.decimal.allow_plus {
-                            expected.push(Expected::Char('+'));
-                        }
-                    }
-                    expected.push(Expected::CharRange('0', '9'));
-                    Expected::one_of(expected)
-                },
-                'e' => if self.decimal.allow_underscores {
-                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_'), Expected::Char('-'), Expected::Char('+')])
-                } else {
-                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('-'), Expected::Char('+')])
-                },
-                '-' => if self.decimal.allow_underscores {
-                    Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_')])
-                } else {
-                    Expected::CharRange('0', '9')
-                },
-                _ => unreachable!(),
-            };
-
-            Err(match r.peek_char(0)? {
-                Some(c) => ParseErrorDetail::UnexpectedInput {
-                    pos: p2,
-                    found: Some(Input::Char(c)),
-                    expected: Some(expected),
-                    task: self.decimal.get_task_name().into(),
-                },
-                None => ParseErrorDetail::UnexpectedEof {
-                    pos: p2,
-                    expected: Some(expected),
-                    task: self.decimal.get_task_name().into(),
+        if notation.is_some() {
+            match last {
+                '0' => {
+                    return Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p2));
                 }
-            })
+                '.' => {
+                    let mut p = p2;
+                    p.offset -= 1;
+                    p.column -= 1;
+                    r.seek(p)?;
+                    return Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p));
+                }
+                _ => {}
+            }
         }
+
+        let expected = match last {
+            ' ' | '.' => {
+                let mut expected = Vec::new();
+                if sign == Sign::None {
+                    if self.decimal.allow_minus {
+                        expected.push(Expected::Char('-'));
+                    }
+                    if self.decimal.allow_plus {
+                        expected.push(Expected::Char('+'));
+                    }
+                }
+                expected.push(Expected::CharRange('0', '9'));
+                Expected::one_of(expected)
+            },
+            'e' => if self.decimal.allow_underscores {
+                Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_'), Expected::Char('-'), Expected::Char('+')])
+            } else {
+                Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('-'), Expected::Char('+')])
+            },
+            '-' => if self.decimal.allow_underscores {
+                Expected::one_of(vec![Expected::CharRange('0', '9'), Expected::Char('_')])
+            } else {
+                Expected::CharRange('0', '9')
+            },
+            _ => unreachable!(),
+        };
+
+        Err(match r.peek_char(0)? {
+            Some(c) => ParseErrorDetail::UnexpectedInput {
+                pos: p2,
+                found: Some(Input::Char(c)),
+                expected: Some(expected),
+                task: self.decimal.get_task_name().into(),
+            },
+            None => ParseErrorDetail::UnexpectedEof {
+                pos: p2,
+                expected: Some(expected),
+                task: self.decimal.get_task_name().into(),
+            }
+        })
     }
 
     pub fn convert_number<N: Numerical>(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
@@ -1033,6 +1045,20 @@ mod tests {
         assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), -123456);
         assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), -123456f32);
         assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), -123456f64);
+    }
+
+    #[test]
+    fn can_parse_decimal_ending_with_dot() {
+        let mut np = NumberParser::new();
+        let mut r = MemCharReader::new(b"123456..");
+        let n = np.parse_number(&mut r).unwrap();
+        assert_eq!(n.term().sign(), Sign::None);
+        assert_eq!(n.term().notation(), Notation::Decimal);
+        assert_eq!(n.from().offset, 0);
+        assert_eq!(n.from().column, 0);
+        assert_eq!(n.to().offset, 6);
+        assert_eq!(n.to().column, 6);
+        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 123456);
     }
 
     #[test]
