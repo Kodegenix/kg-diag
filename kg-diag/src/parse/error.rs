@@ -58,15 +58,45 @@ impl std::fmt::Display for Expected {
 }
 
 
-#[derive(Display, Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Display, Debug, Clone, Copy)]
 pub enum NumericalErrorKind {
     #[display("overflow")]
-    Overflow,
+    Overflow(f64),
     #[display("underflow")]
-    Underflow,
+    Underflow(f64),
     #[display("invalid format error")]
     Invalid,
 }
+
+impl NumericalErrorKind {
+    pub fn has_float(&self) -> bool {
+        match *self {
+            NumericalErrorKind::Overflow(n) | NumericalErrorKind::Underflow(n) => !n.is_nan(),
+            NumericalErrorKind::Invalid => false,
+        }
+    }
+
+    pub fn as_float(&self) -> f64 {
+        match *self {
+            NumericalErrorKind::Overflow(n) | NumericalErrorKind::Underflow(n) => n,
+            NumericalErrorKind::Invalid => std::f64::NAN,
+        }
+    }
+}
+
+impl PartialEq for NumericalErrorKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (*self, *other) {
+            (NumericalErrorKind::Overflow(_), NumericalErrorKind::Overflow(_)) => true,
+            (NumericalErrorKind::Underflow(_), NumericalErrorKind::Underflow(_)) => true,
+            (NumericalErrorKind::Invalid, NumericalErrorKind::Invalid) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for NumericalErrorKind {}
+
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ParseErrorDetail {

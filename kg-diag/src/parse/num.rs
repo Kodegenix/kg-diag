@@ -61,17 +61,17 @@ pub struct Number {
 }
 
 impl Number {
-    pub fn new(notation: Notation, sign: Sign) -> Number {
+    pub fn new(sign: Sign, notation: Notation) -> Number {
         Number {
-            notation,
             sign,
+            notation,
         }
     }
 
-    pub fn token(span: Span, notation: Notation, sign: Sign) -> LexToken<Number> {
+    pub fn token(span: Span, sign: Sign, notation: Notation) -> LexToken<Number> {
         LexToken::new(Number {
-            notation,
             sign,
+            notation,
         }, span.from, span.to)
     }
 
@@ -120,7 +120,7 @@ fn parse_simple_num<N: NotationConfig>(n: &N,
 
     let p2 = r.position();
     if p2 > p {
-        Ok(LexToken::new(Number::new(n.get_notation(), sign), p1, p2))
+        Ok(LexToken::new(Number::new(sign, n.get_notation()), p1, p2))
     } else {
         Err(match r.peek_char(0)? {
             Some(c) => ParseErrorDetail::UnexpectedInput {
@@ -261,14 +261,14 @@ impl NumberParser {
         if notation.is_some() {
             match last {
                 '0' => {
-                    return Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p2));
+                    return Ok(LexToken::new(Number::new(sign, notation.unwrap()), p1, p2));
                 }
                 '.' => {
                     let mut p = p2;
                     p.offset -= 1;
                     p.column -= 1;
                     r.seek(p)?;
-                    return Ok(LexToken::new(Number::new(notation.unwrap(), sign), p1, p));
+                    return Ok(LexToken::new(Number::new(sign, notation.unwrap()), p1, p));
                 }
                 _ => {}
             }
@@ -316,28 +316,30 @@ impl NumberParser {
         })
     }
 
-    pub fn convert_number<N: Numerical>(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
-        let notation = n.term().notation();
-        let sign = n.term().sign();
+    pub fn convert_number_token<N: Numerical>(&mut self, n: &LexToken<Number>, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
+        self.convert_number(n.span(), n.term().sign(), n.term().notation(), r)
+    }
+
+    pub fn convert_number<N: Numerical>(&mut self, span: Span, sign: Sign, notation: Notation, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
         let res = match notation {
             Notation::Decimal => {
-                let s = r.slice(n.from_offset() + sign.len(), n.to_offset())?;
+                let s = r.slice(span.from.offset + sign.len(), span.to.offset)?;
                 parse_decimal(sign, s.as_bytes())
             }
             Notation::Hex => {
-                let s = r.slice(n.from_offset() + sign.len() + self.hex.prefix.len(), n.to_offset())?;
+                let s = r.slice(span.from.offset + sign.len() + self.hex.prefix.len(), span.to.offset)?;
                 parse_hex(sign, s.as_bytes())
             }
             Notation::Octal => {
-                let s = r.slice(n.from_offset() + sign.len() + self.octal.prefix.len(), n.to_offset())?;
+                let s = r.slice(span.from.offset + sign.len() + self.octal.prefix.len(), span.to.offset)?;
                 parse_octal(sign, s.as_bytes())
             }
             Notation::Binary => {
-                let s = r.slice(n.from_offset() + sign.len() + self.binary.prefix.len(), n.to_offset())?;
+                let s = r.slice(span.from.offset + sign.len() + self.binary.prefix.len(), span.to.offset)?;
                 parse_binary(sign, s.as_bytes())
             }
             Notation::Float | Notation::Exponent => {
-                let s = r.slice(n.from_offset(), n.to_offset())?;
+                let s = r.slice(span.from.offset, span.to.offset)?;
                 if self.decimal.allow_underscores {
                     self.buffer.clear();
                     for c in s.chars() {
@@ -352,7 +354,7 @@ impl NumberParser {
             }
         };
         res.map_err(|err| ParseErrorDetail::Numerical {
-            span: n.span(),
+            span,
             kind: err,
         })
     }
@@ -736,9 +738,9 @@ macro_rules! impl_numerical {
                 let min = Self::min_value() as f64;
                 let max = Self::max_value() as f64;
                 if d < min {
-                    Err(NumericalErrorKind::Underflow)
+                    Err(NumericalErrorKind::Underflow(d))
                 } else if d > max {
-                    Err(NumericalErrorKind::Overflow)
+                    Err(NumericalErrorKind::Overflow(d))
                 } else {
                     Ok(d as $ty)
                 }
@@ -897,11 +899,11 @@ fn parse_decimal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalError
             if d != b'_' {
                 match N::mul10(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
                 match N::add(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
             }
         }
@@ -910,11 +912,11 @@ fn parse_decimal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalError
             if d != b'_' {
                 match N::mul10(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
                 match N::sub(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
             }
         }
@@ -929,11 +931,11 @@ fn parse_octal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKi
             if d != b'_' {
                 match N::mul8(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
                 match N::add(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
             }
         }
@@ -942,11 +944,11 @@ fn parse_octal<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKi
             if d != b'_' {
                 match N::mul8(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
                 match N::sub(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
             }
         }
@@ -961,11 +963,11 @@ fn parse_binary<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorK
             if d != b'_' {
                 match N::mul2(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
                 match N::add(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
             }
         }
@@ -974,11 +976,11 @@ fn parse_binary<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorK
             if d != b'_' {
                 match N::mul2(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
                 match N::sub(n, digit_dec(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
             }
         }
@@ -993,11 +995,11 @@ fn parse_hex<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind
             if d != b'_' {
                 match N::mul16(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
                 match N::add(n, digit_hex(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Overflow),
+                    None => return Err(NumericalErrorKind::Overflow(std::f64::NAN)),
                 }
             }
         }
@@ -1006,11 +1008,11 @@ fn parse_hex<N: Numerical>(sign: Sign, s: &[u8]) -> Result<N, NumericalErrorKind
             if d != b'_' {
                 match N::mul16(n) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
                 match N::sub(n, digit_hex(d)) {
                     Some(a) => n = a,
-                    None => return Err(NumericalErrorKind::Underflow),
+                    None => return Err(NumericalErrorKind::Underflow(std::f64::NAN)),
                 }
             }
         }
@@ -1030,9 +1032,9 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::Minus);
         assert_eq!(n.term().notation(), Notation::Exponent);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), -123);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), -123.4568f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), -123.4568f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), -123);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), -123.4568f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), -123.4568f64);
     }
 
     #[test]
@@ -1042,9 +1044,9 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::Minus);
         assert_eq!(n.term().notation(), Notation::Decimal);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), -123456);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), -123456f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), -123456f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), -123456);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), -123456f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), -123456f64);
     }
 
     #[test]
@@ -1058,7 +1060,7 @@ mod tests {
         assert_eq!(n.from().column, 0);
         assert_eq!(n.to().offset, 6);
         assert_eq!(n.to().column, 6);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 123456);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 123456);
     }
 
     #[test]
@@ -1068,9 +1070,9 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::None);
         assert_eq!(n.term().notation(), Notation::Float);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 123);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 123.456f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 123.456f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 123);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), 123.456f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), 123.456f64);
     }
 
     #[test]
@@ -1080,9 +1082,9 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::None);
         assert_eq!(n.term().notation(), Notation::Hex);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0xAAFF);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0xAAFF as f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0xAAFF as f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 0xAAFF);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), 0xAAFF as f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), 0xAAFF as f64);
     }
 
     #[test]
@@ -1092,9 +1094,9 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::None);
         assert_eq!(n.term().notation(), Notation::Octal);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0o777);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0o777 as f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0o777 as f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 0o777);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), 0o777 as f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), 0o777 as f64);
     }
 
     #[test]
@@ -1104,8 +1106,8 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::None);
         assert_eq!(n.term().notation(), Notation::Binary);
-        assert_eq!(np.convert_number::<i32>(&n, &mut r).unwrap(), 0b10010011);
-        assert_eq!(np.convert_number::<f32>(&n, &mut r).unwrap(), 0b10010011 as f32);
-        assert_eq!(np.convert_number::<f64>(&n, &mut r).unwrap(), 0b10010011 as f64);
+        assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 0b10010011);
+        assert_eq!(np.convert_number_token::<f32>(&n, &mut r).unwrap(), 0b10010011 as f32);
+        assert_eq!(np.convert_number_token::<f64>(&n, &mut r).unwrap(), 0b10010011 as f64);
     }
 }

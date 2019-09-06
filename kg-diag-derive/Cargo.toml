@@ -16,7 +16,7 @@ proc-macro = true
 
 [dependencies]
 kg-diag = { version = "0.3.1", path = "../kg-diag" }
-proc-macro2 = { version = "1.0.1", features = ["nightly"] }
+proc-macro2 = { version = "1.0.2", features = ["nightly"] }
 quote = "1.0.2"
 syn = { version = "1.0.5", features = ["full"] }
 synstructure = "0.12.0"
