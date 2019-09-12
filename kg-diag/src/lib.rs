@@ -59,6 +59,7 @@ macro_rules! parse_diag {
         e
     }};
 }
+
 pub trait IntoDiagRes<T> {
     fn into_diag_res(self) -> Result<T, BasicDiag>;
 }

@@ -15,6 +15,8 @@ pub enum OpType {
     Write,
     #[display(fmt = "remove")]
     Remove,
+    #[display(fmt = "stat")]
+    Stat,
 }
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -114,6 +116,10 @@ impl FileBuffer {
             .info(&self.path, OpType::Write, FileType::File)?;
         Ok(())
     }
+
+    pub fn into_data(self) -> Vec<u8> {
+        self.data
+    }
 }
 
 pub fn read_to_string<P: AsRef<Path>>(file_path: P, buf: &mut String) -> IoResult<()> {
@@ -135,6 +141,11 @@ pub fn read_string<P: AsRef<Path>>(file_path: P) -> IoResult<String> {
     Ok(s)
 }
 
+pub fn remove_file<P: Into<PathBuf> + AsRef<Path>>(file_path: P) -> IoResult<()> {
+    std::fs::remove_file(file_path.as_ref()).info(file_path, OpType::Remove, FileType::File)?;
+    Ok(())
+}
+
 pub fn canonicalize<P: AsRef<Path>>(file_path: P) -> IoResult<PathBuf> {
     Ok(std::fs::canonicalize(file_path.as_ref()).info(
         file_path.as_ref(),
@@ -153,17 +164,17 @@ pub fn current_dir() -> IoResult<PathBuf> {
     }
 }
 
-pub fn create_dir<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
-    std::fs::create_dir(dir.as_ref()).info(dir, OpType::Create, FileType::Dir)?;
-    Ok(())
-}
-
 pub fn read_dir<P: AsRef<Path>>(path: P) -> IoResult<ReadDir> {
     std::fs::read_dir(path.as_ref()).info(path.as_ref(), OpType::Read, FileType::Dir)
 }
 
 pub fn write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, contents: C) -> IoResult<()> {
     std::fs::write(path.as_ref(), contents).info(path.as_ref(), OpType::Write, FileType::File)
+}
+
+pub fn create_dir<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
+    std::fs::create_dir(dir.as_ref()).info(dir, OpType::Create, FileType::Dir)?;
+    Ok(())
 }
 
 pub fn create_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
@@ -180,6 +191,33 @@ pub fn create_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
                 file_type: FileType::Dir,
             }
             .into());
+        }
+    }
+    Ok(())
+}
+
+pub fn remove_dir<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
+    std::fs::remove_dir(dir.as_ref()).info(dir, OpType::Remove, FileType::Unknown)?;
+    Ok(())
+}
+
+pub fn remove_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
+    clear_dir_all(dir.as_ref())?;
+    remove_dir(dir)
+}
+
+pub fn clear_dir_all<P: Into<PathBuf> + AsRef<Path>>(dir: P) -> IoResult<()> {
+    let d = read_dir(dir.as_ref())?;
+    for e in d {
+        let e = e.info(dir.as_ref(), OpType::Read, FileType::Dir)?;
+        let ft = e.file_type().info(e.path(), OpType::Stat, FileType::Unknown)?;
+        if ft.is_dir() {
+            remove_dir_all(e.path())?;
+        } else if ft.is_symlink() {
+            let path = e.path();
+            std::fs::remove_file(&path).info(path, OpType::Remove, FileType::Link)?;
+        } else {
+            remove_file(e.path())?;
         }
     }
     Ok(())
