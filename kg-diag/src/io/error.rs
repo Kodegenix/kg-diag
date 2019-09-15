@@ -44,10 +44,10 @@ impl IoErrorDetail {
             IoErrorDetail::Fmt => std::io::ErrorKind::Other,
         }
     }
-    pub fn file_not_found(path: PathBuf, op_type: OpType) -> IoErrorDetail {
+    pub fn file_not_found(path: PathBuf, file_type: FileType, op_type: OpType) -> IoErrorDetail {
         IoErrorDetail::IoPath {
             kind: std::io::ErrorKind::NotFound,
-            file_type: FileType::File,
+            file_type,
             op_type,
             path,
         }
