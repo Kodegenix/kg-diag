@@ -84,24 +84,30 @@ impl TryFrom<char> for Severity {
 }
 
 pub trait Detail: Display + Debug + Send + Sync + 'static {
-    fn severity(&self) -> Severity {
-        Severity::Failure
-    }
+    fn severity(&self) -> Severity;
 
-    fn code(&self) -> u32 {
-        0
-    }
+    fn code(&self) -> u32;
 
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
+    fn type_id(&self) -> TypeId;
 
     fn as_fmt_debug(&self) -> &dyn std::fmt::Debug;
 
     fn as_fmt_display(&self) -> &dyn std::fmt::Display;
 }
 
-default impl<T: Detail> Detail for T {
+impl<T: Detail> Detail for T {
+    default fn severity(&self) -> Severity {
+        Severity::Failure
+    }
+
+    default fn code(&self) -> u32 {
+        0
+    }
+
+    default fn type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
+
     fn as_fmt_debug(&self) -> &dyn std::fmt::Debug {
         self as &dyn std::fmt::Debug
     }

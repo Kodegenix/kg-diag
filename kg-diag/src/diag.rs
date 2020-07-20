@@ -62,7 +62,7 @@ impl dyn Diag {
     }
 }
 
-default impl<T: Detail> Diag for T {
+impl<T: Detail> Diag for T {
     fn detail(&self) -> &dyn Detail {
         self
     }
@@ -71,15 +71,15 @@ default impl<T: Detail> Diag for T {
         self
     }
 
-    fn cause(&self) -> Option<&dyn Diag> {
+    default fn cause(&self) -> Option<&dyn Diag> {
         None
     }
 
-    fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
+    default fn cause_mut(&mut self) -> Option<&mut dyn Diag> {
         None
     }
 
-    fn stacktrace(&self) -> Option<&Stacktrace> {
+    default fn stacktrace(&self) -> Option<&Stacktrace> {
         None
     }
 }
