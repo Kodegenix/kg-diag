@@ -14,6 +14,8 @@ use std;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
+
+#[repr(C)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Position {
     pub offset: usize,
