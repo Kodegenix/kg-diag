@@ -72,7 +72,7 @@ impl Number {
         LexToken::new(Number {
             sign,
             notation,
-        }, span.from, span.to)
+        }, span.start, span.end)
     }
 
     pub fn sign(&self) -> Sign {
@@ -323,23 +323,23 @@ impl NumberParser {
     pub fn convert_number<N: Numerical>(&mut self, span: Span, sign: Sign, notation: Notation, r: &mut dyn CharReader) -> Result<N, ParseErrorDetail> {
         let res = match notation {
             Notation::Decimal => {
-                let s = r.slice(span.from.offset + sign.len(), span.to.offset)?;
+                let s = r.slice(span.start.offset + sign.len(), span.end.offset)?;
                 parse_decimal(sign, s.as_bytes())
             }
             Notation::Hex => {
-                let s = r.slice(span.from.offset + sign.len() + self.hex.prefix.len(), span.to.offset)?;
+                let s = r.slice(span.start.offset + sign.len() + self.hex.prefix.len(), span.end.offset)?;
                 parse_hex(sign, s.as_bytes())
             }
             Notation::Octal => {
-                let s = r.slice(span.from.offset + sign.len() + self.octal.prefix.len(), span.to.offset)?;
+                let s = r.slice(span.start.offset + sign.len() + self.octal.prefix.len(), span.end.offset)?;
                 parse_octal(sign, s.as_bytes())
             }
             Notation::Binary => {
-                let s = r.slice(span.from.offset + sign.len() + self.binary.prefix.len(), span.to.offset)?;
+                let s = r.slice(span.start.offset + sign.len() + self.binary.prefix.len(), span.end.offset)?;
                 parse_binary(sign, s.as_bytes())
             }
             Notation::Float | Notation::Exponent => {
-                let s = r.slice(span.from.offset, span.to.offset)?;
+                let s = r.slice(span.start.offset, span.end.offset)?;
                 if self.decimal.allow_underscores {
                     self.buffer.clear();
                     for c in s.chars() {
@@ -1056,10 +1056,10 @@ mod tests {
         let n = np.parse_number(&mut r).unwrap();
         assert_eq!(n.term().sign(), Sign::None);
         assert_eq!(n.term().notation(), Notation::Decimal);
-        assert_eq!(n.from().offset, 0);
-        assert_eq!(n.from().column, 0);
-        assert_eq!(n.to().offset, 6);
-        assert_eq!(n.to().column, 6);
+        assert_eq!(n.start().offset, 0);
+        assert_eq!(n.start().column, 0);
+        assert_eq!(n.end().offset, 6);
+        assert_eq!(n.end().column, 6);
         assert_eq!(np.convert_number_token::<i32>(&n, &mut r).unwrap(), 123456);
     }
 

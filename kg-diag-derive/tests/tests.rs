@@ -17,11 +17,11 @@ enum TestErrorKind {
     ErrorEmpty,
 
     #[diag(code = 2, severity = 'F')]
-    #[display(fmt = "error with pair of {a0} and {a1}")]
+    #[display(fmt = "error with pair of {_0} and {_1}")]
     ErrorWithPair(usize, usize),
 
     #[diag(severity = "error")]
-    #[display(fmt = "error with \"{a0}\" string")]
+    #[display(fmt = "error with \"{_0}\" string")]
     ErrorWithString(String),
 
     #[diag(code = 4, severity = "failure")]
@@ -29,6 +29,7 @@ enum TestErrorKind {
     ErrorWithStruct { a: usize, b: usize },
 }
 
+//FIXME (jc)
 #[test]
 fn code_deref() {
     let e = TestErrorKind::ErrorWithString("string value".into());

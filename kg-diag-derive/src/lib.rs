@@ -1,8 +1,12 @@
+#![feature(with_options, proc_macro_span)]
+
 extern crate quote;
 #[macro_use]
 extern crate synstructure;
 
 use std::convert::TryFrom;
+use std::fs::File;
+use std::io::Write;
 
 use kg_diag::*;
 use proc_macro2::Span;
@@ -24,6 +28,21 @@ fn path_eq(path: &syn::Path, s: &str) -> bool {
 fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut code_offset: u32 = 0;
     let mut severity = Severity::Failure;
+
+    let mut log_file = None;
+
+    if let Ok(p) = std::env::var("KG_DIAG_OUTPUT") {
+        log_file = Some(File::with_options()
+            .create(true)
+            .write(true)
+            .append(true)
+            .truncate(false)
+            .open(p).unwrap());
+    }
+
+    if log_file.is_some() {
+        write!(log_file.as_mut().unwrap(), "{}\n", Span::call_site().unwrap().source_file().path().display()).unwrap();
+    }
 
     let container_attr = find_nested_attr(&st.ast().attrs, "diag");
     if let Some(params) = container_attr {
@@ -132,6 +151,7 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
         attrs.push(a);
     }
 
+
     for a in attrs.iter() {
         for b in attrs.iter() {
             if a as *const _ == b as *const _ {
@@ -144,6 +164,12 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
                     st.ast().ident
                 ));
             }
+        }
+    }
+
+    if log_file.is_some() {
+        for (v, a) in st.variants().iter().zip(attrs.iter()) {
+            write!(log_file.as_mut().unwrap(), "{}{:04}: {}::{}\n", a.severity.code_char(), a.code, st.ast().ident, v.ast().ident).unwrap();
         }
     }
 
@@ -162,11 +188,11 @@ fn detail_derive(mut st: synstructure::Structure) -> proc_macro2::TokenStream {
         quote! { #code }
     });
 
-    let p = st.gen_impl(quote! {
+    let p = st.underscore_const(true).gen_impl(quote! {
         extern crate kg_diag;
 
         gen impl kg_diag::Detail for @Self {
-            fn severity(&self) -> Severity {
+            fn severity(&self) -> kg_diag::Severity {
                 match *self {
                     #severity_body
                 }

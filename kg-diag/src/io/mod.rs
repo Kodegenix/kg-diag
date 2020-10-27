@@ -65,46 +65,50 @@ impl Default for Position {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct Span {
-    pub from: Position,
-    pub to: Position,
+    pub start: Position,
+    pub end: Position,
 }
 
 impl Span {
     pub fn new() -> Span {
         Span {
-            from: Position::new(),
-            to: Position::new(),
+            start: Position::new(),
+            end: Position::new(),
         }
     }
-    pub fn with(
-        f_offset: usize,
-        f_line: u32,
-        f_column: u32,
-        t_offset: usize,
-        t_line: u32,
-        t_column: u32,
-    ) -> Span {
-        let from = Position::with(f_offset, f_line, f_column);
-        let to = Position::with(t_offset, t_line, t_column);
 
-        Span { from, to }
+    pub fn with(
+        start_offset: usize,
+        start_line: u32,
+        start_column: u32,
+        end_offset: usize,
+        end_line: u32,
+        end_column: u32,
+    ) -> Span {
+        let start = Position::with(start_offset, start_line, start_column);
+        let end = Position::with(end_offset, end_line, end_column);
+        Self::with_pos(start, end)
     }
-    pub fn with_pos(from: Position, to: Position) -> Span {
-        Span { from, to }
+
+    pub fn with_pos(start: Position, end: Position) -> Span {
+        Span {
+            start,
+            end,
+        }
     }
 }
 
 impl std::fmt::Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if f.alternate() || self.from.line != self.to.line {
-            write!(f, "{}-{}", self.from, self.to)
+        if f.alternate() || self.start.line != self.end.line {
+            write!(f, "{}-{}", self.start, self.end)
         } else {
             write!(
                 f,
                 "{}:{}-{}",
-                self.from.line + 1,
-                self.from.column + 1,
-                self.to.column + 1
+                self.start.line + 1,
+                self.start.column + 1,
+                self.end.column + 1
             )
         }
     }
@@ -131,8 +135,8 @@ impl Quote {
     pub fn new<'a>(
         path: Option<&Path>,
         data: &[u8],
-        from: Position,
-        to: Position,
+        start: Position,
+        end: Position,
         lines_before: u32,
         lines_after: u32,
         message: Cow<'a, str>,
@@ -142,27 +146,27 @@ impl Quote {
         let mut off2 = data.len();
         let mut lines = 0;
 
-        let before = &data[0..from.offset];
+        let before = &data[0..start.offset];
         for (p, c) in before.iter().rev().enumerate() {
             if *c == b'\n' {
                 if lines < lines_before {
                     lines += 1;
                 } else {
-                    off1 = from.offset - p;
-                    line = from.line - lines_before;
+                    off1 = start.offset - p;
+                    line = start.line - lines_before;
                     break;
                 }
             }
         }
 
-        let after = &data[to.offset..];
+        let after = &data[end.offset..];
         lines = 0;
         for (p, c) in after.iter().enumerate() {
             if *c == b'\n' {
                 if lines < lines_after {
                     lines += 1;
                 } else {
-                    off2 = to.offset + p;
+                    off2 = end.offset + p;
                     break;
                 }
             }
@@ -170,7 +174,7 @@ impl Quote {
 
         Quote {
             path: path.map(|p| p.to_path_buf()),
-            span: Span { from, to },
+            span: Span::with_pos(start, end),
             offset: off1,
             line,
             source: String::from_utf8_lossy(&data[off1..off2]).into(),
@@ -178,12 +182,12 @@ impl Quote {
         }
     }
 
-    pub fn from(&self) -> Position {
-        self.span.from
+    pub fn start(&self) -> Position {
+        self.span.start
     }
 
-    pub fn to(&self) -> Position {
-        self.span.to
+    pub fn end(&self) -> Position {
+        self.span.end
     }
 
     pub fn span(&self) -> Span {
@@ -230,22 +234,22 @@ impl std::fmt::Display for Quote {
                 " -->",
                 line_chars,
                 self.path.as_ref().unwrap().to_str().unwrap(),
-                self.span.from
+                self.span.start
             )?;
         }
         for s in self.source.lines() {
             if show_line_numbers {
                 write!(f, "{0:>1$}| ", ln + 1, line_chars)?;
             }
-            if ln == self.span.from.line && ln == self.span.to.line {
+            if ln == self.span.start.line && ln == self.span.end.line {
                 write!(f, "{}\n", s)?;
                 if show_line_numbers {
                     write!(f, "{0:1$}| ", " ", line_chars)?;
                 }
-                for _ in 0..self.span.from.column {
+                for _ in 0..self.span.start.column {
                     write!(f, " ")?;
                 }
-                for _ in self.span.from.column..self.span.to.column {
+                for _ in self.span.start.column..self.span.end.column {
                     write!(f, "^")?;
                 }
                 write!(f, " {}\n", self.message)?;
@@ -276,7 +280,7 @@ impl<T: LexTerm + Clone + Copy> LexToken<T> {
     pub fn new(term: T, from: Position, to: Position) -> LexToken<T> {
         LexToken {
             term,
-            span: Span { from, to },
+            span: Span { start: from, end: to },
         }
     }
 
@@ -284,20 +288,12 @@ impl<T: LexTerm + Clone + Copy> LexToken<T> {
         self.term
     }
 
-    pub fn from(&self) -> Position {
-        self.span.from
+    pub fn start(&self) -> Position {
+        self.span.start
     }
 
-    pub fn to(&self) -> Position {
-        self.span.to
-    }
-
-    pub fn from_offset(&self) -> usize {
-        self.span.from.offset
-    }
-
-    pub fn to_offset(&self) -> usize {
-        self.span.to.offset
+    pub fn end(&self) -> Position {
+        self.span.end
     }
 
     pub fn span(&self) -> Span {

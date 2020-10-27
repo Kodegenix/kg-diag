@@ -7,7 +7,7 @@ Error/diagnostic management. I/O routines for reading UTF-8 textual data with po
 """
 readme = "README.md"
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/Kodegenix/kg-diag"
+repository = "https://github.com/kodegenix/kg-diag"
 workspace = ".."
 edition = "2018"
 
