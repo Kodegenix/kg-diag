@@ -139,9 +139,10 @@ pub trait DetailExt {
     fn with_cause<D: Diag>(self, cause: D) -> BasicDiag;
 }
 
-impl <T> DetailExt for T
-    where T: Detail {
+impl <T> DetailExt for T where T: Detail {
     fn with_cause<D: Diag>(self, cause: D) -> BasicDiag {
-       BasicDiag::with_cause(self, cause)
+        BasicDiag::with_cause(self, cause)
     }
 }
+
+impl Detail for String { }
